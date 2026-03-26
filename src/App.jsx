@@ -3023,41 +3023,38 @@ function GradeMyRateLanding({ liveRates, onBack }) {
     }
   };
 
-  const submitLead = () => {
+  const submitLead = async () => {
     if (!lead.name || !lead.email) { setLeadError("Name and email are required."); return; }
     if (!lead.email.includes("@")) { setLeadError("Please enter a valid email."); return; }
     setLeadSubmitting(true);
-    // Simulate a brief async save
-    setTimeout(() => {
-      // Save to Supabase leads table
-      await supabase.from("leads").insert({
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone || null,
-        source: "Grade My Rate",
-        grade: pendingAnalysis?.grade || null,
-        grade_label: pendingAnalysis?.gradeLabel || null,
-        lender_name: pendingAnalysis?.extracted?.lender || null,
-        rate: pendingAnalysis?.extracted?.rate || null,
-        loan_amount: pendingAnalysis?.extracted?.loanAmount || null,
-        monthly_savings: pendingAnalysis?.ourOffer?.monthlySavings || null,
-        lifetime_savings: pendingAnalysis?.ourOffer?.lifetimeSavings || null,
-      });
-      // Also keep in MOCK_DB for lender portal display
-      MOCK_DB.leads.push({
-        id: "lead_" + Date.now(),
-        name: lead.name, email: lead.email, phone: lead.phone,
-        source: "Grade My Rate", capturedAt: new Date().toISOString().slice(0,10),
-        grade: pendingAnalysis?.grade, gradeLabel: pendingAnalysis?.gradeLabel,
-        lender: pendingAnalysis?.extracted?.lender, rate: pendingAnalysis?.extracted?.rate,
-        loanAmount: pendingAnalysis?.extracted?.loanAmount,
-        monthlySavings: pendingAnalysis?.ourOffer?.monthlySavings,
-        lifetimeSavings: pendingAnalysis?.ourOffer?.lifetimeSavings,
-      });
-      setLeadCaptured(true);
-      setShowGate(false);
-      setLeadSubmitting(false);
-    }, 600);
+    // Save to Supabase leads table
+    await supabase.from("leads").insert({
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone || null,
+      source: "Grade My Rate",
+      grade: pendingAnalysis?.grade || null,
+      grade_label: pendingAnalysis?.gradeLabel || null,
+      lender_name: pendingAnalysis?.extracted?.lender || null,
+      rate: pendingAnalysis?.extracted?.rate || null,
+      loan_amount: pendingAnalysis?.extracted?.loanAmount || null,
+      monthly_savings: pendingAnalysis?.ourOffer?.monthlySavings || null,
+      lifetime_savings: pendingAnalysis?.ourOffer?.lifetimeSavings || null,
+    });
+    // Also keep in MOCK_DB for lender portal display
+    MOCK_DB.leads.push({
+      id: "lead_" + Date.now(),
+      name: lead.name, email: lead.email, phone: lead.phone,
+      source: "Grade My Rate", capturedAt: new Date().toISOString().slice(0,10),
+      grade: pendingAnalysis?.grade, gradeLabel: pendingAnalysis?.gradeLabel,
+      lender: pendingAnalysis?.extracted?.lender, rate: pendingAnalysis?.extracted?.rate,
+      loanAmount: pendingAnalysis?.extracted?.loanAmount,
+      monthlySavings: pendingAnalysis?.ourOffer?.monthlySavings,
+      lifetimeSavings: pendingAnalysis?.ourOffer?.lifetimeSavings,
+    });
+    setLeadCaptured(true);
+    setShowGate(false);
+    setLeadSubmitting(false);
   };
 
   return (
