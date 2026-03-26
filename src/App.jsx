@@ -772,6 +772,11 @@ function RealtorPortal({ user, onLogout }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newClient, setNewClient] = useState({ name:"", email:"", phone:"" });
   const [inviteSent, setInviteSent] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [realtorClients, setRealtorClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [clientStatuses, setClientStatuses] = useState({});
   const [contractFiles, setContractFiles] = useState({});
@@ -821,10 +826,49 @@ function RealtorPortal({ user, onLogout }) {
     setContractUploadStep("done");
   };
 
-  const sendInvite = () => {
+  // Load real clients from Supabase on mount
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    setClientsLoading(true);
+    const { data } = await supabase
+      .from("realtor_clients")
+      .select("*, client:profiles!realtor_clients_client_id_fkey(*)")
+      .eq("realtor_id", user.id);
+    if (data) setRealtorClients(data.map(r => r.client).filter(Boolean));
+    setClientsLoading(false);
+  };
+
+  const sendInvite = async () => {
     if (!newClient.name || !newClient.email) return;
-    setInviteSent(true);
-    setTimeout(() => { setShowAdd(false); setInviteSent(false); setNewClient({ name:"",email:"",phone:"" }); }, 2500);
+    setInviteError("");
+    setInviteSending(true);
+    try {
+      // Create invite record in Supabase
+      const { data, error } = await supabase
+        .from("invites")
+        .insert({ realtor_id: user.id, client_email: newClient.email, client_name: newClient.name })
+        .select()
+        .single();
+      if (error) throw error;
+      const link = `${window.location.origin}?invite=${data.token}`;
+      setInviteLink(link);
+      setInviteSent(true);
+    } catch(err) {
+      setInviteError("Failed to create invite. Please try again.");
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
+  const closeInviteModal = () => {
+    setShowAdd(false);
+    setInviteSent(false);
+    setInviteLink("");
+    setInviteError("");
+    setNewClient({ name:"", email:"", phone:"" });
   };
 
   const statusCounts = STATUS_STEPS.reduce((acc,s) => { acc[s] = clients.filter(c=>getClientStatus(c)===s).length; return acc; }, {});
@@ -1169,12 +1213,23 @@ function RealtorPortal({ user, onLogout }) {
           {showAdd && (
             <div style={{ position:"fixed", inset:0, background:"rgba(44,32,18,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(4px)" }}>
               <div className="card" style={{ width:"480px", position:"relative" }}>
-                <button onClick={() => setShowAdd(false)} style={{ position:"absolute", top:"1rem", right:"1rem", background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:"1.2rem" }}>✕</button>
+                <button onClick={closeInviteModal} style={{ position:"absolute", top:"1rem", right:"1rem", background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:"1.2rem" }}>✕</button>
                 {inviteSent ? (
-                  <div style={{ textAlign:"center", padding:"2rem" }}>
-                    <div style={{ fontSize:"2.5rem", marginBottom:"1rem" }}>📧</div>
-                    <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.5rem" }}>Invite Sent!</div>
-                    <div style={{ color:"var(--muted)", fontSize:"0.9rem" }}>{newClient.name} will receive an email with a link to create their account and start their pre-approval.</div>
+                  <div style={{ padding:"1.5rem 0.5rem" }}>
+                    <div style={{ textAlign:"center", marginBottom:"1.25rem" }}>
+                      <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>🔗</div>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.4rem" }}>Invite Ready!</div>
+                      <div style={{ color:"var(--muted)", fontSize:"0.875rem" }}>Share this link with {newClient.name}. When they click it they'll be guided through signup and pre-approval.</div>
+                    </div>
+                    <div style={{ background:"var(--surface)", borderRadius:"10px", padding:"1rem", marginBottom:"1rem", border:"1px solid var(--border)" }}>
+                      <div style={{ fontSize:"0.72rem", color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"0.4rem" }}>Invite Link</div>
+                      <div style={{ fontSize:"0.78rem", wordBreak:"break-all", color:"var(--blue)", fontFamily:"'DM Mono',monospace", marginBottom:"0.75rem" }}>{inviteLink}</div>
+                      <button className="btn-primary" style={{ width:"100%", fontSize:"0.85rem" }} onClick={() => { navigator.clipboard.writeText(inviteLink); }}>📋 Copy Link</button>
+                    </div>
+                    <div style={{ padding:"0.65rem 0.85rem", background:"rgba(61,125,90,0.07)", borderRadius:"8px", fontSize:"0.8rem", color:"var(--green)", marginBottom:"1rem" }}>
+                      ✓ You can also paste this link in a text or email to {newClient.name} directly.
+                    </div>
+                    <button className="btn-secondary" style={{ width:"100%" }} onClick={closeInviteModal}>Done</button>
                   </div>
                 ) : (
                   <>
@@ -1186,8 +1241,9 @@ function RealtorPortal({ user, onLogout }) {
                       <div className="field"><label>Phone (optional)</label><input className="text-input" value={newClient.phone} onChange={e=>setNewClient(c=>({...c,phone:e.target.value}))} placeholder="(555) 000-0000" /></div>
                     </div>
                     <div style={{ display:"flex", gap:"1rem", marginTop:"1.5rem" }}>
-                      <button className="btn-secondary" style={{ flex:1 }} onClick={() => setShowAdd(false)}>Cancel</button>
-                      <button className="btn-primary" style={{ flex:2 }} onClick={sendInvite}>Send Invite Email →</button>
+                      {inviteError && <div style={{ gridColumn:"1/-1", padding:"0.6rem", background:"rgba(192,57,43,0.08)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--red)" }}>{inviteError}</div>}
+                      <button className="btn-secondary" style={{ flex:1 }} onClick={closeInviteModal}>Cancel</button>
+                      <button className="btn-primary" style={{ flex:2, opacity:inviteSending?0.7:1 }} onClick={sendInvite} disabled={inviteSending}>{inviteSending?"Creating invite...":"Generate Invite Link →"}</button>
                     </div>
                   </>
                 )}
@@ -4104,6 +4160,204 @@ function LenderPortal({ user, onLogout }) {
 
 
 
+
+// =============================================
+// INVITE ACCEPT PAGE
+// =============================================
+
+function InviteAcceptPage({ token, onAccepted }) {
+  const [invite, setInvite] = useState(null);
+  const [realtor, setRealtor] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [view, setView] = useState("welcome"); // welcome | signup | login
+  const [form, setForm] = useState({ name:"", email:"", password:"" });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    loadInvite();
+  }, [token]);
+
+  const loadInvite = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("invites")
+      .select("*, realtor:profiles!invites_realtor_id_fkey(*), realtor_info:realtors!invites_realtor_id_fkey(*)")
+      .eq("token", token)
+      .single();
+    if (error || !data) { setError("This invite link is invalid or has expired."); setLoading(false); return; }
+    if (data.status === "accepted") { setError("This invite has already been accepted."); setLoading(false); return; }
+    setInvite(data);
+    setRealtor(data.realtor);
+    setForm(f => ({ ...f, name: data.client_name || "", email: data.client_email || "" }));
+    setLoading(false);
+  };
+
+  const acceptInvite = async (userId) => {
+    // Mark invite as accepted
+    await supabase.from("invites").update({ status:"accepted", accepted_at: new Date().toISOString() }).eq("token", token);
+    // Link client to realtor
+    await supabase.from("realtor_clients").upsert({ realtor_id: invite.realtor_id, client_id: userId, invite_id: invite.id });
+    onAccepted();
+  };
+
+  const handleSignUp = async () => {
+    setFormError("");
+    if (!form.name || !form.email || !form.password) { setFormError("All fields are required."); return; }
+    setSubmitting(true);
+    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    if (error) { setFormError(error.message); setSubmitting(false); return; }
+    if (data.user) {
+      await supabase.from("profiles").insert({ id: data.user.id, role:"buyer", name: form.name, email: form.email });
+      await acceptInvite(data.user.id);
+    }
+    setSubmitting(false);
+  };
+
+  const handleLogin = async () => {
+    setFormError("");
+    if (!form.email || !form.password) { setFormError("Email and password are required."); return; }
+    setSubmitting(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+    if (error) { setFormError(error.message); setSubmitting(false); return; }
+    if (data.user) await acceptInvite(data.user.id);
+    setSubmitting(false);
+  };
+
+  if (loading) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0", fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{PORTAL_CSS}</style>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:"1rem" }}>HomeStart</div>
+        <div style={{ color:"#8a7968" }}>Loading your invite...</div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0", fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{PORTAL_CSS}</style>
+      <div style={{ textAlign:"center", maxWidth:"400px", padding:"2rem" }}>
+        <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>❌</div>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, marginBottom:"0.75rem" }}>Invite Not Found</div>
+        <div style={{ color:"var(--muted)", marginBottom:"1.5rem" }}>{error}</div>
+        <button className="btn-primary" onClick={() => window.location.href = "/"}>Go to HomeStart →</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:"var(--bg)", fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{PORTAL_CSS}</style>
+
+      {/* Header */}
+      <header style={{ padding:"1.25rem 2rem", background:"white", borderBottom:"1px solid var(--border)", textAlign:"center" }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>HomeStart</div>
+      </header>
+
+      <div style={{ maxWidth:"480px", margin:"3rem auto", padding:"0 1.5rem" }}>
+
+        {/* Welcome view */}
+        {view === "welcome" && (
+          <div>
+            {/* Realtor card */}
+            <div className="card" style={{ textAlign:"center", marginBottom:"1.5rem", background:"linear-gradient(135deg,rgba(194,113,79,0.07),rgba(194,113,79,0.03))", border:"1px solid rgba(194,113,79,0.2)" }}>
+              <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c2714f,#a85c3a)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"1.1rem", color:"white", margin:"0 auto 1rem" }}>
+                {realtor?.name?.split(" ").map(n=>n[0]).join("").slice(0,2) || "??"}
+              </div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.25rem" }}>
+                {realtor?.name || "Your Realtor"} invited you
+              </div>
+              <div style={{ color:"var(--muted)", fontSize:"0.875rem" }}>
+                to start your mortgage pre-approval with HomeStart
+              </div>
+            </div>
+
+            {/* What to expect */}
+            <div className="card" style={{ marginBottom:"1.5rem" }}>
+              <div className="section-label">What happens next</div>
+              {[
+                { icon:"👤", step:"Create your free account", desc:"Takes about 60 seconds" },
+                { icon:"📋", step:"Complete your pre-approval profile", desc:"Income, employment, and basic financials" },
+                { icon:"✅", step:"Get pre-approved", desc:"Your loan officer will review and issue your letter" },
+                { icon:"🏠", step:"Start shopping with confidence", desc:"Share your pre-approval with any seller" },
+              ].map((s,i) => (
+                <div key={i} style={{ display:"flex", gap:"1rem", padding:"0.65rem 0", borderBottom:i<3?"1px solid var(--border)":"none" }}>
+                  <div style={{ fontSize:"1.25rem", flexShrink:0 }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontWeight:600, fontSize:"0.875rem" }}>{s.step}</div>
+                    <div style={{ color:"var(--muted)", fontSize:"0.78rem" }}>{s.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button className="btn-primary" style={{ width:"100%", padding:"0.9rem", fontSize:"1rem", marginBottom:"0.75rem" }} onClick={() => setView("signup")}>
+              Get Started →
+            </button>
+            <div style={{ textAlign:"center", fontSize:"0.85rem", color:"var(--muted)" }}>
+              Already have an account?{" "}
+              <span style={{ color:"var(--accent)", cursor:"pointer", fontWeight:600 }} onClick={() => setView("login")}>Sign in instead</span>
+            </div>
+          </div>
+        )}
+
+        {/* Signup view */}
+        {view === "signup" && (
+          <div>
+            <button onClick={() => setView("welcome")} style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", marginBottom:"1.25rem", fontSize:"0.85rem" }}>← Back</button>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.6rem", fontWeight:700, marginBottom:"0.25rem" }}>Create your account</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.875rem", marginBottom:"1.5rem" }}>
+              Invited by <strong style={{ color:"var(--text)" }}>{realtor?.name}</strong>
+            </div>
+            <div className="card">
+              {formError && <div style={{ padding:"0.65rem 0.85rem", background:"rgba(192,57,43,0.08)", border:"1px solid rgba(192,57,43,0.2)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--red)", marginBottom:"1rem" }}>{formError}</div>}
+              <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+                <div className="field"><label>Full Name *</label><input className="text-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Jane Smith" /></div>
+                <div className="field"><label>Email *</label><input className="text-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="jane@email.com" /></div>
+                <div className="field"><label>Password *</label><input className="text-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••••" /></div>
+              </div>
+              <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem", opacity:submitting?0.7:1 }} onClick={handleSignUp} disabled={submitting}>
+                {submitting ? "Creating account..." : "Create Account & Accept Invite →"}
+              </button>
+            </div>
+            <div style={{ textAlign:"center", marginTop:"1rem", fontSize:"0.85rem", color:"var(--muted)" }}>
+              Already have an account?{" "}
+              <span style={{ color:"var(--accent)", cursor:"pointer", fontWeight:600 }} onClick={() => setView("login")}>Sign in instead</span>
+            </div>
+          </div>
+        )}
+
+        {/* Login view */}
+        {view === "login" && (
+          <div>
+            <button onClick={() => setView("welcome")} style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", marginBottom:"1.25rem", fontSize:"0.85rem" }}>← Back</button>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.6rem", fontWeight:700, marginBottom:"0.25rem" }}>Welcome back</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.875rem", marginBottom:"1.5rem" }}>
+              Sign in to accept {realtor?.name ? `${realtor.name}'s` : "the"} invite
+            </div>
+            <div className="card">
+              {formError && <div style={{ padding:"0.65rem 0.85rem", background:"rgba(192,57,43,0.08)", border:"1px solid rgba(192,57,43,0.2)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--red)", marginBottom:"1rem" }}>{formError}</div>}
+              <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+                <div className="field"><label>Email</label><input className="text-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="jane@email.com" /></div>
+                <div className="field"><label>Password</label><input className="text-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••••" /></div>
+              </div>
+              <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem", opacity:submitting?0.7:1 }} onClick={handleLogin} disabled={submitting}>
+                {submitting ? "Signing in..." : "Sign In & Accept Invite →"}
+              </button>
+            </div>
+            <div style={{ textAlign:"center", marginTop:"1rem", fontSize:"0.85rem", color:"var(--muted)" }}>
+              New to HomeStart?{" "}
+              <span style={{ color:"var(--accent)", cursor:"pointer", fontWeight:600 }} onClick={() => setView("signup")}>Create an account</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Thin wrapper so GradeMyRateLanding can access useLiveRates (hooks must be called in components)
 function GradeMyRateLandingWrapper({ onBack }) {
   const liveRates = useLiveRates();
@@ -4121,6 +4375,9 @@ export default function App() {
   const [showLoanApp, setShowLoanApp] = useState(false);
   const [loanAppComplete, setLoanAppComplete] = useState(false);
   const liveRates = useLiveRates();
+
+  // Check for invite token in URL
+  const inviteToken = new URLSearchParams(window.location.search).get("invite");
 
   useEffect(() => {
     // Check for existing session on load
@@ -4156,6 +4413,18 @@ export default function App() {
     setShowLoanApp(false); setLoanAppComplete(false);
   };
   const handleOnboardingComplete = (form) => setClientOnboarded(true);
+
+  // Invite link — show accept page regardless of auth state
+  if (inviteToken && !authLoading) return (
+    <InviteAcceptPage
+      token={inviteToken}
+      onAccepted={() => {
+        // Clear the invite token from URL and reload into the app
+        window.history.replaceState({}, "", "/");
+        setClientOnboarded(true);
+      }}
+    />
+  );
 
   // Loading state while checking auth
   if (authLoading) return (
