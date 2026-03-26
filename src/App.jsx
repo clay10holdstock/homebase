@@ -846,18 +846,29 @@ function RealtorPortal({ user, onLogout }) {
     setInviteError("");
     setInviteSending(true);
     try {
-      // Create invite record in Supabase
-      const { data, error } = await supabase
+      // Insert the invite
+      const { error: insertError } = await supabase
         .from("invites")
-        .insert({ realtor_id: user.id, client_email: newClient.email, client_name: newClient.name })
-        .select()
+        .insert({ realtor_id: user.id, client_email: newClient.email, client_name: newClient.name });
+      if (insertError) throw insertError;
+
+      // Fetch it back by realtor_id + email (most recent)
+      const { data, error: fetchError } = await supabase
+        .from("invites")
+        .select("token")
+        .eq("realtor_id", user.id)
+        .eq("client_email", newClient.email)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
         .single();
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+
       const link = `${window.location.origin}?invite=${data.token}`;
       setInviteLink(link);
       setInviteSent(true);
     } catch(err) {
-      setInviteError("Failed to create invite. Please try again.");
+      setInviteError("Failed to create invite: " + (err.message || err));
     } finally {
       setInviteSending(false);
     }
@@ -4181,16 +4192,31 @@ function InviteAcceptPage({ token, onAccepted }) {
 
   const loadInvite = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // Fetch invite by token
+    const { data: inviteData, error: inviteError } = await supabase
       .from("invites")
-      .select("*, realtor:profiles!invites_realtor_id_fkey(*), realtor_info:realtors!invites_realtor_id_fkey(*)")
+      .select("*")
       .eq("token", token)
       .single();
-    if (error || !data) { setError("This invite link is invalid or has expired."); setLoading(false); return; }
-    if (data.status === "accepted") { setError("This invite has already been accepted."); setLoading(false); return; }
-    setInvite(data);
-    setRealtor(data.realtor);
-    setForm(f => ({ ...f, name: data.client_name || "", email: data.client_email || "" }));
+    if (inviteError || !inviteData) {
+      setError("This invite link is invalid or has expired.");
+      setLoading(false);
+      return;
+    }
+    if (inviteData.status === "accepted") {
+      setError("This invite has already been accepted.");
+      setLoading(false);
+      return;
+    }
+    setInvite(inviteData);
+    // Fetch realtor profile separately
+    const { data: realtorData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", inviteData.realtor_id)
+      .single();
+    setRealtor(realtorData);
+    setForm(f => ({ ...f, name: inviteData.client_name || "", email: inviteData.client_email || "" }));
     setLoading(false);
   };
 
