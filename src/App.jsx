@@ -792,7 +792,18 @@ function RealtorPortal({ user, onLogout }) {
   const [contractFileName, setContractFileName] = useState("");
   const [contractDragOver, setContractDragOver] = useState(false);
 
-  const clients = MOCK_DB.clients.filter(c => user.clients?.includes(c.id));
+  // Merge real Supabase clients with mock clients for demo purposes
+  const clients = realtorClients.length > 0
+    ? realtorClients.map(c => ({
+        ...c,
+        status: c.status || "Account Created",
+        loanAmount: c.loan_amount || null,
+        loanType: c.loan_type || null,
+        preApprovalDate: c.pre_approval_date || null,
+        flags: c.flags || [],
+        downPct: c.down_pct || null,
+      }))
+    : MOCK_DB.clients.filter(c => user.clients?.includes(c.id));
   const getClientStatus = (client) => clientStatuses[client.id] || client.status;
 
   const selectClient = (client) => {
@@ -833,11 +844,29 @@ function RealtorPortal({ user, onLogout }) {
 
   const loadClients = async () => {
     setClientsLoading(true);
-    const { data } = await supabase
+    // Load accepted clients
+    const { data: clientData } = await supabase
       .from("realtor_clients")
       .select("*, client:profiles!realtor_clients_client_id_fkey(*)")
       .eq("realtor_id", user.id);
-    if (data) setRealtorClients(data.map(r => r.client).filter(Boolean));
+
+    // Load pending invites to show in pipeline
+    const { data: inviteData } = await supabase
+      .from("invites")
+      .select("*")
+      .eq("realtor_id", user.id)
+      .eq("status", "pending");
+
+    const acceptedClients = (clientData || []).map(r => r.client).filter(Boolean).map(c => ({ ...c, status: "Account Created" }));
+    const pendingInvites = (inviteData || []).map(inv => ({
+      id: inv.id,
+      name: inv.client_name || inv.client_email,
+      email: inv.client_email,
+      status: "Invited",
+      loanAmount: null, loanType: null, preApprovalDate: null, flags: [], downPct: null,
+    }));
+
+    setRealtorClients([...acceptedClients, ...pendingInvites]);
     setClientsLoading(false);
   };
 
@@ -4445,9 +4474,9 @@ export default function App() {
     <InviteAcceptPage
       token={inviteToken}
       onAccepted={() => {
-        // Clear the invite token from URL and reload into the app
+        // Clear the invite token from URL — keep clientOnboarded false so wizard shows
         window.history.replaceState({}, "", "/");
-        setClientOnboarded(true);
+        setClientOnboarded(false);
       }}
     />
   );
