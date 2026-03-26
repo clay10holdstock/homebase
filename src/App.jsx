@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "./supabase.js";
 
 const BUYER_TABS = ["Affordability", "Find Homes", "Credit & DTI", "Shop Loans", "Pre-Approval", "Grade My Rate", "Find a Realtor"];
 const OWNER_TABS = ["My Dashboard", "Refi Monitor", "Home Value", "Equity", "Contractors", "Insurance"];
@@ -601,20 +602,34 @@ function AuthScreen({ onLogin }) {
   const [signup, setSignup] = useState({ name:"", email:"", phone:"", brokerage:"", license:"", password:"", confirm:"" });
   const [signupDone, setSignupDone] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError("");
-    if (loginType === "lender") {
-      const lo = MOCK_DB.lenders.find(l => l.email === email && l.password === password);
-      if (lo || email === "") { onLogin({ type: "lender", user: MOCK_DB.lenders[0] }); return; }
-    } else if (loginType === "realtor") {
-      const r = MOCK_DB.realtors.find(r => r.email === email && r.password === password);
-      if (r || email === "") { onLogin({ type: "realtor", user: MOCK_DB.realtors[0] }); return; }
-    } else {
-      const c = MOCK_DB.clients.find(c => c.email === email && c.password === password);
-      if (c) { onLogin({ type: "client", user: c }); return; }
-      if (email === "") { onLogin({ type: "client", user: MOCK_DB.clients[0] }); return; }
+    if (!email || !password) { setError("Please enter your email and password."); return; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setError(error.message);
+  };
+
+  const handleSignUp = async (role) => {
+    setError("");
+    if (!email || !password) { setError("Please enter your email and password."); return; }
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) { setError(error.message); return; }
+    if (data.user) {
+      await supabase.from("profiles").insert({
+        id: data.user.id,
+        role,
+        email,
+        name: signup.name || email.split("@")[0],
+        phone: signup.phone || null,
+      });
+      if (role === "realtor") {
+        await supabase.from("realtors").insert({
+          id: data.user.id,
+          brokerage: signup.brokerage || null,
+          license: signup.license || null,
+        });
+      }
     }
-    setError("Invalid credentials. Leave fields blank to use demo.");
   };
 
   if (signupDone) return (
@@ -648,8 +663,34 @@ function AuthScreen({ onLogin }) {
             <div className="field"><label>Password *</label><input className="text-input" type="password" value={signup.password} onChange={e => setSignup(s=>({...s,password:e.target.value}))} placeholder="••••••••" /></div>
             <div className="field"><label>Confirm Password</label><input className="text-input" type="password" value={signup.confirm} onChange={e => setSignup(s=>({...s,confirm:e.target.value}))} placeholder="••••••••" /></div>
           </div>
-          <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={() => { if(!signup.name||!signup.email||!signup.brokerage){setError("Fill in required fields.");return;} setSignupDone(true); }}>Create My Account →</button>
+          <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={async () => { if(!signup.name||!signup.email||!signup.password){setError("Fill in required fields.");return;} setEmail(signup.email); setPassword(signup.password); await handleSignUp("realtor"); setSignupDone(true); }}>Create My Account →</button>
           <div style={{ textAlign:"center", fontSize:"0.75rem", color:"var(--muted)", marginTop:"0.75rem" }}>By signing up you agree to our Terms of Service and Privacy Policy</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (view === "buyer-signup") return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"var(--bg)", padding:"2rem" }}>
+      <style>{PORTAL_CSS}</style>
+      <div style={{ width:"100%", maxWidth:"420px" }}>
+        <button className="btn-secondary" style={{ marginBottom:"1.5rem", fontSize:"0.8rem" }} onClick={() => setView("login")}>← Back</button>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.8rem", fontWeight:700, marginBottom:"0.25rem" }}>Create Your Account</div>
+        <div style={{ color:"var(--muted)", marginBottom:"1.5rem", fontSize:"0.9rem" }}>Free to join. Get pre-approved, track your home, and manage your mortgage.</div>
+        <div className="card">
+          {error && <div style={{ padding:"0.75rem", background:"rgba(192,57,43,0.08)", border:"1px solid rgba(192,57,43,0.25)", borderRadius:"8px", color:"var(--red)", fontSize:"0.85rem", marginBottom:"1rem" }}>{error}</div>}
+          <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+            <div className="field"><label>Full Name *</label><input className="text-input" value={signup.name} onChange={e=>setSignup(s=>({...s,name:e.target.value}))} placeholder="Jane Smith" /></div>
+            <div className="field"><label>Email *</label><input className="text-input" value={signup.email} onChange={e=>setSignup(s=>({...s,email:e.target.value}))} placeholder="jane@email.com" /></div>
+            <div className="field"><label>Phone</label><input className="text-input" value={signup.phone} onChange={e=>setSignup(s=>({...s,phone:e.target.value}))} placeholder="(555) 000-0000" /></div>
+            <div className="field"><label>Password *</label><input className="text-input" type="password" value={signup.password} onChange={e=>setSignup(s=>({...s,password:e.target.value}))} placeholder="••••••••" /></div>
+          </div>
+          <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={async () => {
+            if(!signup.name||!signup.email||!signup.password){setError("Fill in required fields.");return;}
+            setEmail(signup.email); setPassword(signup.password);
+            await handleSignUp("buyer");
+          }}>Create Account →</button>
+          <div style={{ textAlign:"center", fontSize:"0.75rem", color:"var(--muted)", marginTop:"0.75rem" }}>By signing up you agree to our Terms of Service</div>
         </div>
       </div>
     </div>
@@ -675,7 +716,10 @@ function AuthScreen({ onLogin }) {
           <div className="field" style={{ marginBottom:"1rem" }}><label>Email</label><input className="text-input" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" /></div>
           <div className="field" style={{ marginBottom:"1.5rem" }}><label>Password</label><input className="text-input" type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" /></div>
           <button className="btn-primary" style={{ width:"100%", padding:"0.85rem" }} onClick={handleLogin}>Sign In →</button>
-          <div style={{ textAlign:"center", marginTop:"1rem", fontSize:"0.8rem", color:"var(--muted)" }}>Leave fields blank to demo the platform</div>
+          <div style={{ textAlign:"center", marginTop:"1rem", fontSize:"0.8rem", color:"var(--muted)" }}>
+            {loginType === "client" && <span>New here? <span style={{ color:"var(--accent)", cursor:"pointer", fontWeight:600 }} onClick={() => setView("buyer-signup")}>Create a free account</span></span>}
+            {loginType === "lender" && <span>Contact <a href="mailto:admin@homestart.com" style={{ color:"var(--accent)" }}>admin@homestart.com</a> to get access</span>}
+          </div>
         </div>
         {loginType==="realtor" && <div style={{ textAlign:"center", marginTop:"1.5rem", fontSize:"0.9rem", color:"var(--muted)" }}>Don't have an account? <span style={{ color:"var(--accent)", cursor:"pointer", fontWeight:600 }} onClick={() => setView("realtor-signup")}>Sign up free</span></div>}
         <div style={{ textAlign:"center", marginTop:"1rem" }}><button className="btn-secondary" style={{ fontSize:"0.8rem" }} onClick={() => setView("landing")}>← Back</button></div>
@@ -2985,17 +3029,27 @@ function GradeMyRateLanding({ liveRates, onBack }) {
     setLeadSubmitting(true);
     // Simulate a brief async save
     setTimeout(() => {
-      MOCK_DB.leads.push({
-        id: "lead_" + Date.now(),
+      // Save to Supabase leads table
+      await supabase.from("leads").insert({
         name: lead.name,
         email: lead.email,
-        phone: lead.phone,
+        phone: lead.phone || null,
         source: "Grade My Rate",
-        capturedAt: new Date().toISOString().slice(0,10),
-        grade: pendingAnalysis?.grade,
-        gradeLabel: pendingAnalysis?.gradeLabel,
-        lender: pendingAnalysis?.extracted?.lender,
-        rate: pendingAnalysis?.extracted?.rate,
+        grade: pendingAnalysis?.grade || null,
+        grade_label: pendingAnalysis?.gradeLabel || null,
+        lender_name: pendingAnalysis?.extracted?.lender || null,
+        rate: pendingAnalysis?.extracted?.rate || null,
+        loan_amount: pendingAnalysis?.extracted?.loanAmount || null,
+        monthly_savings: pendingAnalysis?.ourOffer?.monthlySavings || null,
+        lifetime_savings: pendingAnalysis?.ourOffer?.lifetimeSavings || null,
+      });
+      // Also keep in MOCK_DB for lender portal display
+      MOCK_DB.leads.push({
+        id: "lead_" + Date.now(),
+        name: lead.name, email: lead.email, phone: lead.phone,
+        source: "Grade My Rate", capturedAt: new Date().toISOString().slice(0,10),
+        grade: pendingAnalysis?.grade, gradeLabel: pendingAnalysis?.gradeLabel,
+        lender: pendingAnalysis?.extracted?.lender, rate: pendingAnalysis?.extracted?.rate,
         loanAmount: pendingAnalysis?.extracted?.loanAmount,
         monthlySavings: pendingAnalysis?.ourOffer?.monthlySavings,
         lifetimeSavings: pendingAnalysis?.ourOffer?.lifetimeSavings,
@@ -4061,6 +4115,8 @@ function GradeMyRateLandingWrapper({ onBack }) {
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [clientOnboarded, setClientOnboarded] = useState(false);
   const [mode, setMode] = useState("buyer");
   const [activeTab, setActiveTab] = useState(0);
@@ -4069,24 +4125,67 @@ export default function App() {
   const [loanAppComplete, setLoanAppComplete] = useState(false);
   const liveRates = useLiveRates();
 
+  useEffect(() => {
+    // Check for existing session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) loadProfile(session.user.id);
+      else setAuthLoading(false);
+    });
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) loadProfile(session.user.id);
+      else { setProfile(null); setAuthLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadProfile = async (userId) => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+    setProfile(data);
+    if (data?.role === "buyer") setClientOnboarded(true);
+    setAuthLoading(false);
+  };
+
   const handleLogin = (sess) => {
+    // Used by demo login fallback only
     setSession(sess);
     if (sess.type === "client" && sess.user.onboarded) setClientOnboarded(true);
   };
-  const handleLogout = () => { setSession(null); setClientOnboarded(false); setShowLoanApp(false); setLoanAppComplete(false); };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null); setProfile(null); setClientOnboarded(false);
+    setShowLoanApp(false); setLoanAppComplete(false);
+  };
   const handleOnboardingComplete = (form) => setClientOnboarded(true);
+
+  // Loading state while checking auth
+  if (authLoading) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:"1rem" }}>HomeStart</div>
+        <div style={{ color:"#8a7968", fontSize:"0.9rem" }}>Loading...</div>
+      </div>
+    </div>
+  );
+
+  // Determine role — from Supabase profile if available, else from demo session
+  const role = profile?.role || session?.type;
+  const user = profile ? { ...profile, name: profile.name, email: profile.email } : session?.user;
 
   // Not logged in → show landing/auth
   if (!session) return <AuthScreen onLogin={handleLogin} />;
 
   // Lender → show lender portal
-  if (session.type === "lender") return <LenderPortal user={session.user} onLogout={handleLogout} />;
+  if (role === "lender") return <LenderPortal user={user} onLogout={handleLogout} />;
 
   // Realtor → show realtor portal
-  if (session.type === "realtor") return <RealtorPortal user={session.user} onLogout={handleLogout} />;
+  if (role === "realtor") return <RealtorPortal user={user} onLogout={handleLogout} />;
 
   // Client not yet onboarded → show wizard
-  if (session.type === "client" && !clientOnboarded) return <ClientOnboardingWizard user={session.user} onComplete={handleOnboardingComplete} />;
+  if (role === "buyer" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
+  if (role === "client" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
 
   // Client onboarded → show main platform
   const switchMode = (m) => { setMode(m); setActiveTab(0); setOwnerTab(0); };
