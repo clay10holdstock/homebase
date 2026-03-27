@@ -4276,7 +4276,8 @@ function InviteAcceptPage({ token, onAccepted }) {
     await supabase.from("invites").update({ status:"accepted", accepted_at: new Date().toISOString() }).eq("token", token);
     // Link client to realtor
     await supabase.from("realtor_clients").upsert({ realtor_id: invite.realtor_id, client_id: userId, invite_id: invite.id });
-    onAccepted();
+    // Force a clean reload into the app — clears invite token and triggers fresh auth
+    window.location.href = "/";
   };
 
   const handleSignUp = async () => {
