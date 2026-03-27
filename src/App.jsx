@@ -4475,7 +4475,18 @@ export default function App() {
   const loadProfile = async (userId) => {
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
     setProfile(data);
-    if (data?.role === "buyer") setClientOnboarded(true);
+    // Only mark as onboarded if they have previously completed onboarding
+    // Check realtor_clients to see if they came via invite (need onboarding)
+    if (data?.role === "buyer") {
+      const { data: clientLink } = await supabase
+        .from("realtor_clients")
+        .select("id")
+        .eq("client_id", userId)
+        .single();
+      // If they have a realtor link and onboarded flag not set, send to wizard
+      if (data?.onboarded) setClientOnboarded(true);
+      else setClientOnboarded(false);
+    }
     setAuthLoading(false);
   };
 
@@ -4489,7 +4500,13 @@ export default function App() {
     setSession(null); setProfile(null); setClientOnboarded(false);
     setShowLoanApp(false); setLoanAppComplete(false);
   };
-  const handleOnboardingComplete = (form) => setClientOnboarded(true);
+  const handleOnboardingComplete = async (form) => {
+    // Mark profile as onboarded in Supabase
+    if (session?.user?.id) {
+      await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+    }
+    setClientOnboarded(true);
+  };
 
   // Invite link — show accept page regardless of auth state
   if (inviteToken && !authLoading) return (
