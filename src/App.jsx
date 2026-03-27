@@ -4311,6 +4311,9 @@ function InviteAcceptPage({ token, onAccepted }) {
       .eq("token", token);
     if (inviteError) console.error("invite update error:", inviteError);
 
+    // Mark as NOT onboarded so wizard shows exactly once after reload
+    await supabase.from("profiles").update({ onboarded: false }).eq("id", userId);
+
     // Force a clean reload into the app
     window.location.href = "/";
   };
