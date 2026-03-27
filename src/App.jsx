@@ -609,25 +609,33 @@ function AuthScreen({ onLogin }) {
     if (error) setError(error.message);
   };
 
-  const handleSignUp = async (role) => {
+  const handleSignUp = async (role, opts = {}) => {
     setError("");
-    if (!email || !password) { setError("Please enter your email and password."); return; }
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const _email = opts.email || email;
+    const _password = opts.password || password;
+    const _name = opts.name || signup.name || _email.split("@")[0];
+    const _phone = opts.phone || signup.phone || null;
+    const _brokerage = opts.brokerage || signup.brokerage || null;
+    const _license = opts.license || signup.license || null;
+    if (!_email || !_password) { setError("Please enter your email and password."); return; }
+    const { data, error } = await supabase.auth.signUp({ email: _email, password: _password });
     if (error) { setError(error.message); return; }
     if (data.user) {
-      await supabase.from("profiles").insert({
+      const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         role,
-        email,
-        name: signup.name || email.split("@")[0],
-        phone: signup.phone || null,
+        email: _email,
+        name: _name,
+        phone: _phone,
       });
+      if (profileError) console.error("Profile insert error:", profileError);
       if (role === "realtor") {
-        await supabase.from("realtors").insert({
+        const { error: realtorError } = await supabase.from("realtors").insert({
           id: data.user.id,
-          brokerage: signup.brokerage || null,
-          license: signup.license || null,
+          brokerage: _brokerage,
+          license: _license,
         });
+        if (realtorError) console.error("Realtor insert error:", realtorError);
       }
     }
   };
@@ -639,7 +647,7 @@ function AuthScreen({ onLogin }) {
         <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>🎉</div>
         <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.8rem", fontWeight:700, marginBottom:"0.75rem" }}>You're all set!</div>
         <div style={{ color:"var(--muted)", marginBottom:"2rem", lineHeight:1.6 }}>Your realtor account is ready. Start adding clients and they'll receive a welcome email with login instructions.</div>
-        <button className="btn-primary" style={{ width:"100%", padding:"0.85rem" }} onClick={() => onLogin({ type:"realtor", user:{ ...MOCK_DB.realtors[0], name:signup.name, email:signup.email, brokerage:signup.brokerage } })}>Enter Your Dashboard →</button>
+        <button className="btn-primary" style={{ width:"100%", padding:"0.85rem" }} onClick={() => setView("login")}>Sign In to Your Dashboard →</button>
       </div>
     </div>
   );
@@ -663,7 +671,11 @@ function AuthScreen({ onLogin }) {
             <div className="field"><label>Password *</label><input className="text-input" type="password" value={signup.password} onChange={e => setSignup(s=>({...s,password:e.target.value}))} placeholder="••••••••" /></div>
             <div className="field"><label>Confirm Password</label><input className="text-input" type="password" value={signup.confirm} onChange={e => setSignup(s=>({...s,confirm:e.target.value}))} placeholder="••••••••" /></div>
           </div>
-          <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={async () => { if(!signup.name||!signup.email||!signup.password){setError("Fill in required fields.");return;} setEmail(signup.email); setPassword(signup.password); await handleSignUp("realtor"); setSignupDone(true); }}>Create My Account →</button>
+          <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={async () => {
+  if(!signup.name||!signup.email||!signup.password){setError("Fill in required fields.");return;}
+  await handleSignUp("realtor", { email:signup.email, password:signup.password, name:signup.name, phone:signup.phone, brokerage:signup.brokerage, license:signup.license });
+  setSignupDone(true);
+}}>Create My Account →</button>
           <div style={{ textAlign:"center", fontSize:"0.75rem", color:"var(--muted)", marginTop:"0.75rem" }}>By signing up you agree to our Terms of Service and Privacy Policy</div>
         </div>
       </div>
@@ -687,8 +699,7 @@ function AuthScreen({ onLogin }) {
           </div>
           <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem" }} onClick={async () => {
             if(!signup.name||!signup.email||!signup.password){setError("Fill in required fields.");return;}
-            setEmail(signup.email); setPassword(signup.password);
-            await handleSignUp("buyer");
+            await handleSignUp("buyer", { email:signup.email, password:signup.password, name:signup.name, phone:signup.phone });
           }}>Create Account →</button>
           <div style={{ textAlign:"center", fontSize:"0.75rem", color:"var(--muted)", marginTop:"0.75rem" }}>By signing up you agree to our Terms of Service</div>
         </div>
