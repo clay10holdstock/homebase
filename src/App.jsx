@@ -895,6 +895,17 @@ function RealtorPortal({ user, onLogout }) {
 
       const link = `${window.location.origin}?invite=${data.token}`;
       setInviteLink(link);
+      // Send invite email via serverless function
+      await fetch("/api/send-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientEmail: newClient.email,
+          clientName: newClient.name,
+          realtorName: user.name,
+          inviteLink: link,
+        }),
+      });
       setInviteSent(true);
     } catch(err) {
       setInviteError("Failed to create invite: " + (err.message || err));
