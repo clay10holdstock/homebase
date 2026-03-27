@@ -1433,7 +1433,18 @@ function ClientOnboardingWizard({ user, onComplete }) {
             {step>0 && <button className="btn-secondary" onClick={()=>setStep(s=>s-1)}>← Back</button>}
             {step<steps.length-1
               ? <button className="btn-primary" onClick={()=>setStep(s=>s+1)}>Continue →</button>
-              : <button className="btn-primary" onClick={()=>onComplete(form)}>Submit & Get Pre-Approved ✦</button>
+              : <button className="btn-primary" onClick={async () => {
+                // Save onboarding data to Supabase profiles
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                  await supabase.from("profiles").update({
+                    onboarded: true,
+                    phone: form.phone || null,
+                    name: `${form.firstName} ${form.lastName}`.trim() || null,
+                  }).eq("id", session.user.id);
+                }
+                onComplete(form);
+              }}>Submit & Get Pre-Approved ✦</button>
             }
           </div>
         </div>
@@ -4272,11 +4283,20 @@ function InviteAcceptPage({ token, onAccepted }) {
   };
 
   const acceptInvite = async (userId) => {
+    // Link client to realtor first
+    const { error: linkError } = await supabase
+      .from("realtor_clients")
+      .upsert({ realtor_id: invite.realtor_id, client_id: userId, invite_id: invite.id });
+    if (linkError) console.error("realtor_clients error:", linkError);
+
     // Mark invite as accepted
-    await supabase.from("invites").update({ status:"accepted", accepted_at: new Date().toISOString() }).eq("token", token);
-    // Link client to realtor
-    await supabase.from("realtor_clients").upsert({ realtor_id: invite.realtor_id, client_id: userId, invite_id: invite.id });
-    // Force a clean reload into the app — clears invite token and triggers fresh auth
+    const { error: inviteError } = await supabase
+      .from("invites")
+      .update({ status:"accepted", accepted_at: new Date().toISOString() })
+      .eq("token", token);
+    if (inviteError) console.error("invite update error:", inviteError);
+
+    // Force a clean reload into the app
     window.location.href = "/";
   };
 
