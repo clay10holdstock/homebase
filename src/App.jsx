@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
 
-const BUYER_TABS = ["Affordability", "Find Homes", "Credit & DTI", "Shop Loans", "Pre-Approval", "Grade My Rate", "Find a Realtor"];
-const OWNER_TABS = ["My Dashboard", "Refi Monitor", "Home Value", "Equity", "Contractors", "Insurance"];
-const BUYER_TITLES = ["How Much Can I Afford?", "Homes in My Budget", "Credit Score & DTI", "Shop & Compare Loans", "Pre-Approval Letter", "Grade My Rate", "Find a Realtor"];
-const OWNER_TITLES = ["Homeowner Dashboard", "Refi Monitor & Rate Alerts", "Home Value Tracker", "Equity & Wealth", "Contractor Marketplace", "Insurance Manager"];
+const BUYER_TABS = ["Pre-Approval", "Grade My Rate"];
+const BUYER_TITLES = ["Pre-Approval", "Grade My Rate"];
 
 // Derive spread-based estimates for loan types not directly surveyed
 function buildLoanProducts(r30, r15) {
@@ -422,16 +420,20 @@ function ShopLoansSection({ liveRates }) {
   );
 }
 
-function PreApprovalSection() {
+function PreApprovalSection({ user, profile }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "",
+    firstName: (user?.name || "").split(" ")[0] || "",
+    lastName: (user?.name || "").split(" ").slice(1).join(" ") || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
     income: "", employer: "", jobYears: "",
-    assets: "", creditScore: "", ssn: "",
+    assets: "", creditScore: "",
     propPrice: "", propType: "Single Family", downPct: "20",
     loanType: "Conventional 30-Year Fixed"
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -484,64 +486,75 @@ function PreApprovalSection() {
     }
   ];
 
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const price = parseFloat((form.propPrice || "0").replace(/[^0-9.]/g, "")) || 0;
+      const downPct = parseFloat(form.downPct) || 20;
+      const loanAmt = price * (1 - downPct / 100);
+
+      // Save pre-approval to Supabase profiles
+      if (user?.id) {
+        await supabase.from("profiles").update({
+          pre_approval_status: "under_review",
+          pre_approval_submitted_at: new Date().toISOString(),
+          pre_approval_data: JSON.stringify(form),
+        }).eq("id", user.id);
+
+        // Update status in realtor_clients
+        await supabase.from("realtor_clients").update({
+          client_status: "Pre-Approval Review",
+        }).eq("client_id", user.id);
+      }
+    } catch(e) {
+      console.error("Pre-approval save error:", e);
+    }
+    setSubmitting(false);
+    setSubmitted(true);
+  };
+
   if (submitted) {
     const price = parseFloat((form.propPrice || "385000").replace(/[^0-9.]/g, "")) || 385000;
-    const income = parseFloat((form.income || "85000").replace(/[^0-9.]/g, "")) || 85000;
     const downPct = parseFloat(form.downPct) || 20;
     const loanAmt = price * (1 - downPct / 100);
-    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const expiry = new Date(Date.now() + 90 * 86400000).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
     return (
-      <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-        <div style={{ background: "linear-gradient(135deg, #fdf8f4 0%, #f5ece3 100%)", borderRadius: "16px", padding: "3rem", border: "2px solid rgba(194,113,79,0.35)", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, right: 0, width: "200px", height: "200px", background: "radial-gradient(circle, rgba(194,113,79,0.12), transparent 70%)" }} />
-          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏠</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-0.02em" }}>Pre-Approval Letter</div>
-            <div style={{ color: "#9a8878", fontSize: "0.9rem" }}>Mortgage Pre-Qualification Certificate</div>
-          </div>
-          <div style={{ borderTop: "1px solid #e8c4b0", borderBottom: "1px solid #e8c4b0", padding: "1.5rem 0", marginBottom: "1.5rem" }}>
-            <div style={{ fontSize: "0.8rem", color: "#a8968a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>Issued to</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{form.firstName} {form.lastName}</div>
-            <div style={{ color: "#9a8878", fontSize: "0.9rem" }}>{form.email}</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
-            <div style={{ background: "rgba(194,113,79,0.08)", borderRadius: "10px", padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", color: "#a8968a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pre-Approved Amount</div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--blue)" }}>{formatCurrency(price)}</div>
-            </div>
-            <div style={{ background: "rgba(61,125,90,0.08)", borderRadius: "10px", padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", color: "#a8968a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Loan Amount</div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--green)" }}>{formatCurrency(loanAmt)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: "0.75rem", color: "#a8968a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Loan Type</div>
-              <div style={{ fontWeight: 600, marginTop: "0.25rem" }}>{form.loanType}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: "0.75rem", color: "#a8968a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Down Payment</div>
-              <div style={{ fontWeight: 600, marginTop: "0.25rem" }}>{formatCurrency(price * downPct / 100)} ({form.downPct}%)</div>
-            </div>
-          </div>
-          <div style={{ fontSize: "0.8rem", color: "#b0988c", borderTop: "1px solid rgba(194,113,79,0.15)", paddingTop: "1rem", lineHeight: 1.6 }}>
-            This pre-approval is based on information provided and is subject to verification of income, assets, and credit. Valid until {expiry}. This is not a commitment to lend.
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
-            <div style={{ fontSize: "0.75rem", color: "#b8a89c" }}>Issued: {today}</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.2rem", color: "#c0b0a4", fontStyle: "italic" }}>HomeStart Mortgage</div>
+      <div style={{ maxWidth: "640px", margin: "0 auto" }}>
+        {/* Under Review Banner */}
+        <div style={{ background:"linear-gradient(135deg,rgba(47,111,168,0.1),rgba(47,111,168,0.05))", border:"1px solid rgba(47,111,168,0.25)", borderRadius:"16px", padding:"2rem", textAlign:"center", marginBottom:"1.5rem" }}>
+          <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>⏳</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, marginBottom:"0.5rem", color:"var(--blue)" }}>Application Under Review</div>
+          <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
+            Your pre-approval application has been submitted. A HomeStart loan officer will review your information and get back to you within <strong>1–2 business days</strong>.
           </div>
         </div>
-        <div style={{ display: "flex", gap: "1rem", marginTop: "1.5rem", justifyContent: "center" }}>
-          <button className="btn-primary" onClick={() => window.print()}>⬇ Download PDF</button>
-          <button className="btn-secondary" onClick={() => { setSubmitted(false); setStep(0); }}>Start Over</button>
+
+        {/* Summary of what was submitted */}
+        <div className="card">
+          <div className="section-label">What You Submitted</div>
+          {[
+            ["Name", `${form.firstName} ${form.lastName}`],
+            ["Email", form.email],
+            ["Employer", form.employer || "—"],
+            ["Annual Income", form.income || "—"],
+            ["Purchase Price", form.propPrice || "—"],
+            ["Down Payment", `${form.downPct}%`],
+            ["Loan Type", form.loanType],
+            ["Estimated Loan Amount", formatCurrency(loanAmt)],
+          ].map(([k,v],i) => (
+            <div key={i} className="breakdown-row"><span>{k}</span><span style={{ color:"var(--text)", fontWeight:500 }}>{v}</span></div>
+          ))}
+        </div>
+
+        <div style={{ marginTop:"1rem", padding:"0.85rem 1rem", background:"rgba(61,125,90,0.07)", borderRadius:"10px", border:"1px solid rgba(61,125,90,0.2)", fontSize:"0.85rem", color:"var(--green)", textAlign:"center" }}>
+          ✓ Your realtor has been notified that your application is under review.
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+    <div style={{ maxWidth: "640px", margin: "0 auto" }}>
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem" }}>
         {steps.map((s, i) => (
           <div key={i} style={{ flex: 1, height: "4px", borderRadius: "2px", background: i <= step ? "var(--accent)" : "var(--border)", transition: "background 0.3s" }} />
@@ -555,7 +568,9 @@ function PreApprovalSection() {
           {step > 0 && <button className="btn-secondary" onClick={() => setStep(s => s - 1)}>← Back</button>}
           {step < steps.length - 1
             ? <button className="btn-primary" onClick={() => setStep(s => s + 1)}>Continue →</button>
-            : <button className="btn-primary" onClick={() => setSubmitted(true)}>Generate Pre-Approval Letter ✦</button>
+            : <button className="btn-primary" style={{ opacity:submitting?0.7:1 }} disabled={submitting} onClick={handleSubmit}>
+                {submitting ? "Submitting..." : "Submit for Pre-Approval ✦"}
+              </button>
           }
         </div>
       </div>
@@ -4569,11 +4584,10 @@ export default function App() {
   if (role === "client" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
 
   // Client onboarded → show main platform
-  const switchMode = (m) => { setMode(m); setActiveTab(0); setOwnerTab(0); };
-  const NAV_ITEMS = mode === "buyer" ? BUYER_TABS : OWNER_TABS;
-  const TAB_TITLES = mode === "buyer" ? BUYER_TITLES : OWNER_TITLES;
-  const currentTab = mode === "buyer" ? activeTab : ownerTab;
-  const setCurrentTab = mode === "buyer" ? setActiveTab : setOwnerTab;
+  const NAV_ITEMS = BUYER_TABS;
+  const TAB_TITLES = BUYER_TITLES;
+  const currentTab = activeTab;
+  const setCurrentTab = setActiveTab;
 
   return (
     <>
@@ -4836,13 +4850,7 @@ export default function App() {
 
       <div className="app">
         <header>
-          <div className="logo">HomeStart<span>{mode === "buyer" ? "Mortgage Platform" : "Homeowner Dashboard"}</span></div>
-
-          {/* Mode Toggle */}
-          <div style={{ display: "flex", background: "var(--surface)", borderRadius: "10px", padding: "3px", border: "1px solid var(--border)" }}>
-            <button onClick={() => switchMode("buyer")} style={{ padding:"0.4rem 1.1rem", borderRadius:"8px", border:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:600, fontSize:"0.85rem", background:mode==="buyer"?"white":"transparent", color:mode==="buyer"?"var(--accent)":"var(--muted)", transition:"all 0.2s", boxShadow: mode==="buyer" ? "0 1px 3px rgba(44,32,18,0.1)" : "none" }}>🏠 Buying</button>
-            <button onClick={() => switchMode("owner")} style={{ padding:"0.4rem 1.1rem", borderRadius:"8px", border:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:600, fontSize:"0.85rem", background:mode==="owner"?"white":"transparent", color:mode==="owner"?"var(--accent)":"var(--muted)", transition:"all 0.2s", boxShadow: mode==="owner" ? "0 1px 3px rgba(44,32,18,0.1)" : "none" }}>🔑 I Own a Home</button>
-          </div>
+          <div className="logo">HomeStart<span>Mortgage Platform</span></div>
 
           <nav>
             {NAV_ITEMS.map((item, i) => (
@@ -4853,7 +4861,7 @@ export default function App() {
           {/* User chip */}
           <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginLeft:"1rem" }}>
             <div style={{ width:"32px", height:"32px", borderRadius:"50%", background:"linear-gradient(135deg,#c2714f,#a85c3a)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.75rem", flexShrink:0, color:"white" }}>
-              {session?.user?.name?.split(" ").map(n=>n[0]).join("").slice(0,2)}
+              {(user?.name || session?.user?.email || "?").split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase()}
             </div>
             <button onClick={handleLogout} style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:"0.8rem" }}>Sign Out</button>
           </div>
@@ -4922,41 +4930,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Hero — only on buyer mode tab 0 */}
-        {mode === "buyer" && activeTab === 0 && (
-          <div className="hero">
-            <h1>Your path to <em>homeownership</em><br />starts here</h1>
-            <p>Understand what you can afford, improve your credit, shop loans, and get pre-approved — all in one place.</p>
-            <div className="hero-btns">
-              <button className="btn-primary" onClick={() => setActiveTab(0)}>Calculate Affordability</button>
-              <button className="btn-secondary" onClick={() => setActiveTab(4)}>Get Pre-Approved</button>
-            </div>
-          </div>
-        )}
+
 
         <main>
           <div className="tab-header">
             <div className="tab-title">{TAB_TITLES[currentTab]}</div>
           </div>
-
-          {mode === "buyer" && <>
-            {activeTab === 0 && <AffordabilitySection defaultRate={liveRates.r30} />}
-            {activeTab === 1 && <FindHomesSection />}
-            {activeTab === 2 && <CreditSection r30={liveRates.r30} />}
-            {activeTab === 3 && <ShopLoansSection liveRates={liveRates} />}
-            {activeTab === 4 && <PreApprovalSection />}
-            {activeTab === 5 && <GradeMyRateSection liveRates={liveRates} />}
-            {activeTab === 6 && <FindRealtorSection session={session} />}
-          </>}
-
-          {mode === "owner" && <>
-            {ownerTab === 0 && <OwnerDashboard liveRates={liveRates} setOwnerTab={setOwnerTab} />}
-            {ownerTab === 1 && <RefiMonitor liveRates={liveRates} />}
-            {ownerTab === 2 && <HomeValueSection />}
-            {ownerTab === 3 && <EquitySection />}
-            {ownerTab === 4 && <ContractorMarketplace />}
-            {ownerTab === 5 && <InsuranceManager />}
-          </>}
+          {activeTab === 0 && <PreApprovalSection user={user} profile={profile} />}
+          {activeTab === 1 && <GradeMyRateSection liveRates={liveRates} />}
         </main>
       </div>
     </>
