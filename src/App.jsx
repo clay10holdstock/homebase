@@ -421,6 +421,8 @@ function ShopLoansSection({ liveRates }) {
 }
 
 function PreApprovalSection({ user, profile }) {
+  // If profile already has a pre_approval_status, start in submitted state
+  const alreadySubmitted = !!profile?.pre_approval_status;
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     firstName: (user?.name || "").split(" ")[0] || "",
@@ -429,10 +431,13 @@ function PreApprovalSection({ user, profile }) {
     phone: user?.phone || "",
     income: "", employer: "", jobYears: "",
     assets: "", creditScore: "",
+    // Co-applicant
+    hasCoApplicant: false,
+    coFirstName: "", coLastName: "", coIncome: "", coEmployer: "",
     propPrice: "", propType: "Single Family", downPct: "20",
     loanType: "Conventional 30-Year Fixed"
   });
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(alreadySubmitted);
   const [submitting, setSubmitting] = useState(false);
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -453,11 +458,24 @@ function PreApprovalSection({ user, profile }) {
       title: "Employment & Income",
       fields: (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-          <div className="field" style={{ gridColumn: "1/-1" }}><label>Employer Name</label><input className="text-input" value={form.employer} onChange={e => update("employer", e.target.value)} placeholder="Acme Corp" /></div>
+          <div className="field" style={{ gridColumn:"1/-1" }}><label>Employer Name</label><input className="text-input" value={form.employer} onChange={e => update("employer", e.target.value)} placeholder="Acme Corp" /></div>
           <div className="field"><label>Annual Gross Income</label><input className="text-input" value={form.income} onChange={e => update("income", e.target.value)} placeholder="$85,000" /></div>
           <div className="field"><label>Years at Job</label><input className="text-input" value={form.jobYears} onChange={e => update("jobYears", e.target.value)} placeholder="3" /></div>
           <div className="field"><label>Total Assets / Savings</label><input className="text-input" value={form.assets} onChange={e => update("assets", e.target.value)} placeholder="$50,000" /></div>
           <div className="field"><label>Estimated Credit Score</label><input className="text-input" value={form.creditScore} onChange={e => update("creditScore", e.target.value)} placeholder="720" /></div>
+          <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem", marginTop:"0.25rem" }}>
+            <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem", fontWeight:500 }}>
+              <input type="checkbox" checked={form.hasCoApplicant} onChange={e=>update("hasCoApplicant",e.target.checked)} style={{ width:"16px", height:"16px" }} />
+              Adding a spouse or co-applicant
+            </label>
+          </div>
+          {form.hasCoApplicant && <>
+            <div style={{ gridColumn:"1/-1", fontSize:"0.78rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:600, marginTop:"0.25rem" }}>Co-Applicant</div>
+            <div className="field"><label>First Name</label><input className="text-input" value={form.coFirstName} onChange={e=>update("coFirstName",e.target.value)} placeholder="John" /></div>
+            <div className="field"><label>Last Name</label><input className="text-input" value={form.coLastName} onChange={e=>update("coLastName",e.target.value)} placeholder="Smith" /></div>
+            <div className="field"><label>Employer</label><input className="text-input" value={form.coEmployer} onChange={e=>update("coEmployer",e.target.value)} placeholder="Corp Inc" /></div>
+            <div className="field"><label>Annual Gross Income</label><input className="text-input" value={form.coIncome} onChange={e=>update("coIncome",e.target.value)} placeholder="$65,000" /></div>
+          </>}
         </div>
       )
     },
@@ -1293,20 +1311,18 @@ function RealtorPortal({ user, onLogout }) {
                 <button onClick={closeInviteModal} style={{ position:"absolute", top:"1rem", right:"1rem", background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:"1.2rem" }}>✕</button>
                 {inviteSent ? (
                   <div style={{ padding:"1.5rem 0.5rem" }}>
-                    <div style={{ textAlign:"center", marginBottom:"1.25rem" }}>
-                      <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>🔗</div>
-                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.4rem" }}>Invite Ready!</div>
-                      <div style={{ color:"var(--muted)", fontSize:"0.875rem" }}>Share this link with {newClient.name}. When they click it they'll be guided through signup and pre-approval.</div>
+                    <div style={{ textAlign:"center", marginBottom:"1.5rem" }}>
+                      <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>📧</div>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.5rem" }}>Invite Sent!</div>
+                      <div style={{ color:"var(--muted)", fontSize:"0.875rem", lineHeight:1.6 }}>
+                        <strong style={{ color:"var(--text)" }}>{newClient.name}</strong> has been invited to join HomeStart.<br/>
+                        You'll be notified once they've created their account and started their pre-approval.
+                      </div>
                     </div>
-                    <div style={{ background:"var(--surface)", borderRadius:"10px", padding:"1rem", marginBottom:"1rem", border:"1px solid var(--border)" }}>
-                      <div style={{ fontSize:"0.72rem", color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"0.4rem" }}>Invite Link</div>
-                      <div style={{ fontSize:"0.78rem", wordBreak:"break-all", color:"var(--blue)", fontFamily:"'DM Mono',monospace", marginBottom:"0.75rem" }}>{inviteLink}</div>
-                      <button className="btn-primary" style={{ width:"100%", fontSize:"0.85rem" }} onClick={() => { navigator.clipboard.writeText(inviteLink); }}>📋 Copy Link</button>
+                    <div style={{ padding:"0.85rem 1rem", background:"rgba(61,125,90,0.07)", borderRadius:"10px", border:"1px solid rgba(61,125,90,0.15)", fontSize:"0.85rem", color:"var(--green)", marginBottom:"1.25rem", textAlign:"center" }}>
+                      ✓ They'll appear in your pipeline as "Invited" until they sign up
                     </div>
-                    <div style={{ padding:"0.65rem 0.85rem", background:"rgba(61,125,90,0.07)", borderRadius:"8px", fontSize:"0.8rem", color:"var(--green)", marginBottom:"1rem" }}>
-                      ✓ You can also paste this link in a text or email to {newClient.name} directly.
-                    </div>
-                    <button className="btn-secondary" style={{ width:"100%" }} onClick={closeInviteModal}>Done</button>
+                    <button className="btn-primary" style={{ width:"100%" }} onClick={() => { closeInviteModal(); loadClients(); }}>Done</button>
                   </div>
                 ) : (
                   <>
@@ -3172,7 +3188,7 @@ function GradeMyRateLanding({ liveRates, onBack }) {
     if (!lead.email.includes("@")) { setLeadError("Please enter a valid email."); return; }
     setLeadSubmitting(true);
     // Save to Supabase leads table
-    await supabase.from("leads").insert({
+    const { error: leadDbError } = await supabase.from("leads").insert({
       name: lead.name,
       email: lead.email,
       phone: lead.phone || null,
@@ -3184,7 +3200,9 @@ function GradeMyRateLanding({ liveRates, onBack }) {
       loan_amount: pendingAnalysis?.extracted?.loanAmount || null,
       monthly_savings: pendingAnalysis?.ourOffer?.monthlySavings || null,
       lifetime_savings: pendingAnalysis?.ourOffer?.lifetimeSavings || null,
+      assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015",
     });
+    if (leadDbError) console.error("Lead insert error:", leadDbError);
     // Also keep in MOCK_DB for lender portal display
     MOCK_DB.leads.push({
       id: "lead_" + Date.now(),
@@ -3595,10 +3613,38 @@ function LenderPortal({ user, onLogout }) {
   const [selected, setSelected] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showDecisionModal, setShowDecisionModal] = useState(null); // "approve"|"suspend"|"deny"
+  const [showDecisionModal, setShowDecisionModal] = useState(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionRate, setDecisionRate] = useState("");
   const [decisionDone, setDecisionDone] = useState(false);
+  const [realLeads, setRealLeads] = useState([]);
+  const [leadsLoading, setLeadsLoading] = useState(true);
+  const [preApprovalQueue, setPreApprovalQueue] = useState([]);
+
+  useEffect(() => {
+    loadRealLeads();
+    loadPreApprovalQueue();
+  }, []);
+
+  const loadRealLeads = async () => {
+    setLeadsLoading(true);
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("captured_at", { ascending: false });
+    if (error) console.error("Leads load error:", error);
+    if (data) setRealLeads(data);
+    setLeadsLoading(false);
+  };
+
+  const loadPreApprovalQueue = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*, realtor_clients(realtor_id)")
+      .eq("pre_approval_status", "under_review");
+    if (error) console.error("Pre-approval queue error:", error);
+    if (data) setPreApprovalQueue(data);
+  };
 
   const statuses = ["All", ...Object.keys(APP_STATUS_COLORS)];
 
@@ -3950,7 +3996,7 @@ function LenderPortal({ user, onLogout }) {
           <div className="l-nav-label">Analytics</div>
           <button className={`l-nav-btn${activeTab==="reports"?" active":""}`} onClick={() => setActiveTab("reports")}><span className="icon">📈</span>Reports</button>
           <div className="l-nav-label">Growth</div>
-          <button className={`l-nav-btn${activeTab==="leads"?" active":""}`} onClick={() => setActiveTab("leads")}><span className="icon">⚡</span>Rate Grader Leads<span className="badge">{MOCK_DB.leads.length}</span></button>
+          <button className={`l-nav-btn${activeTab==="leads"?" active":""}`} onClick={() => setActiveTab("leads")}><span className="icon">⚡</span>Rate Grader Leads<span className="badge">{realLeads.length}</span></button>
         </nav>
         <div style={{ padding:"1rem", borderTop:"1px solid rgba(255,255,255,0.07)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", marginBottom:"0.75rem" }}>
@@ -4102,30 +4148,37 @@ function LenderPortal({ user, onLogout }) {
           {/* ── PRE-APPROVALS ── */}
           {activeTab === "preapprovals" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"1.25rem" }}>
-              <div style={{ padding:"1rem 1.25rem", background:"var(--blue-bg)", borderRadius:"10px", border:"1px solid rgba(47,111,168,0.2)", fontSize:"0.88rem", color:"var(--blue)" }}>
-                📋 Pre-approval requests are generated from client onboarding submissions. Review financials and issue letters through the Realtor Portal.
-              </div>
-              <div className="l-card" style={{ padding:0, overflow:"hidden" }}>
-                <table className="l-table">
-                  <thead>
-                    <tr><th>Borrower</th><th>Income</th><th>Credit Score</th><th>Requested Amount</th><th>DTI</th><th>Status</th><th>Realtor</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    {applications.filter(a => ["Pre-Approval Review","Documents Needed"].includes(a.status) || a.status === "Application Review").map((a,i) => (
-                      <tr key={i} onClick={() => setSelected(a)}>
-                        <td><div style={{ fontWeight:600 }}>{a.clientName}</div><div style={{ fontSize:"0.75rem", color:"var(--muted)" }}>{a.firstTimeBuyer?"First-time buyer":"Repeat buyer"}</div></td>
-                        <td><span className="mono">{formatCurrency(a.annualIncome)}/yr</span></td>
-                        <td><span style={{ fontWeight:700, color: a.creditScore>=740?"var(--green)":a.creditScore>=680?"var(--amber)":"var(--red)" }}>{a.creditScore}</span></td>
-                        <td><span className="mono">{formatCurrency(a.loanAmount)}</span></td>
-                        <td><span style={{ fontWeight:700, color: a.dti>43?"var(--red)":a.dti>36?"var(--amber)":"var(--green)" }}>{a.dti}%</span></td>
-                        <td><StatusChip status={a.status} /></td>
-                        <td style={{ fontSize:"0.82rem", color:"var(--muted)" }}>{a.realtorName}</td>
-                        <td style={{ color:"var(--muted)" }}>→</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {preApprovalQueue.length === 0 ? (
+                <div className="l-card" style={{ textAlign:"center", padding:"4rem 2rem" }}>
+                  <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>📋</div>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, marginBottom:"0.5rem" }}>No pending pre-approvals</div>
+                  <div style={{ color:"var(--muted)", fontSize:"0.875rem" }}>Pre-approval submissions from clients will appear here.</div>
+                </div>
+              ) : (
+                <div className="l-card" style={{ padding:0, overflow:"hidden" }}>
+                  <table className="l-table">
+                    <thead>
+                      <tr><th>Borrower</th><th>Email</th><th>Income</th><th>Purchase Price</th><th>Loan Type</th><th>Submitted</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {preApprovalQueue.map((p,i) => {
+                        const data = p.pre_approval_data ? JSON.parse(p.pre_approval_data) : {};
+                        return (
+                          <tr key={i}>
+                            <td style={{ fontWeight:600 }}>{p.name}</td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.email}</td>
+                            <td><span className="mono">{data.income || "—"}</span></td>
+                            <td><span className="mono">{data.propPrice || "—"}</span></td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{data.loanType || "—"}</td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.pre_approval_submitted_at ? new Date(p.pre_approval_submitted_at).toLocaleDateString() : "—"}</td>
+                            <td><span className="l-status-chip" style={{ background:"rgba(47,111,168,0.1)", color:"var(--blue)", borderColor:"rgba(47,111,168,0.25)" }}>Under Review</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -4148,7 +4201,7 @@ function LenderPortal({ user, onLogout }) {
                 ))}
               </div>
 
-              {MOCK_DB.leads.length === 0 ? (
+              {realLeads.length === 0 ? (
                 <div className="l-card" style={{ textAlign:"center", padding:"4rem 2rem" }}>
                   <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>⚡</div>
                   <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.25rem", fontWeight:700, marginBottom:"0.5rem" }}>No leads yet</div>
@@ -4163,18 +4216,18 @@ function LenderPortal({ user, onLogout }) {
                       <tr><th>Name</th><th>Email</th><th>Phone</th><th>Grade</th><th>Lender</th><th>Rate</th><th>Mo. Savings</th><th>Captured</th><th></th></tr>
                     </thead>
                     <tbody>
-                      {MOCK_DB.leads.map((lead,i)=>{
+                      {realLeads.map((lead,i)=>{
                         const gc = {"A":"var(--green)","B":"#5a9e6f","C":"var(--amber)","D":"#c05a2a","F":"var(--red)"}[lead.grade]||"var(--muted)";
                         return (
                           <tr key={i}>
                             <td style={{ fontWeight:600 }}>{lead.name}</td>
                             <td style={{ color:"var(--blue)", fontSize:"0.85rem" }}><a href={"mailto:"+lead.email} style={{ color:"inherit", textDecoration:"none" }}>{lead.email}</a></td>
                             <td style={{ color:"var(--muted)", fontSize:"0.85rem" }}>{lead.phone||"—"}</td>
-                            <td><span style={{ fontWeight:800, fontSize:"1rem", color:gc }}>{lead.grade}</span><span style={{ marginLeft:"0.4rem", fontSize:"0.72rem", color:"var(--muted)" }}>{lead.gradeLabel}</span></td>
-                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{lead.lender||"—"}</td>
+                            <td><span style={{ fontWeight:800, fontSize:"1rem", color:gc }}>{lead.grade}</span><span style={{ marginLeft:"0.4rem", fontSize:"0.72rem", color:"var(--muted)" }}>{lead.grade_label}</span></td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{lead.lender_name||"—"}</td>
                             <td><span className="mono">{lead.rate?lead.rate+"%":"—"}</span></td>
-                            <td style={{ color:"var(--green)", fontWeight:600 }}>{lead.monthlySavings?formatCurrency(lead.monthlySavings)+"/mo":"—"}</td>
-                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{lead.capturedAt}</td>
+                            <td style={{ color:"var(--green)", fontWeight:600 }}>{lead.monthly_savings?formatCurrency(lead.monthly_savings)+"/mo":"—"}</td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{lead.captured_at ? new Date(lead.captured_at).toLocaleDateString() : "—"}</td>
                             <td><button className="l-btn-primary" style={{ fontSize:"0.75rem", padding:"0.3rem 0.75rem" }} onClick={()=>window.open("mailto:"+lead.email)}>Contact</button></td>
                           </tr>
                         );
@@ -4259,7 +4312,7 @@ function InviteAcceptPage({ token, onAccepted }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState("welcome"); // welcome | signup | login
-  const [form, setForm] = useState({ name:"", email:"", password:"" });
+  const [form, setForm] = useState({ name:"", email:"", phone:"", password:"" });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -4293,7 +4346,7 @@ function InviteAcceptPage({ token, onAccepted }) {
       .eq("id", inviteData.realtor_id)
       .single();
     setRealtor(realtorData);
-    setForm(f => ({ ...f, name: inviteData.client_name || "", email: inviteData.client_email || "" }));
+    setForm(f => ({ ...f, name: inviteData.client_name || "", email: inviteData.client_email || "", phone: inviteData.client_phone || "" }));
     setLoading(false);
   };
 
@@ -4325,7 +4378,7 @@ function InviteAcceptPage({ token, onAccepted }) {
     const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password });
     if (error) { setFormError(error.message); setSubmitting(false); return; }
     if (data.user) {
-      await supabase.from("profiles").insert({ id: data.user.id, role:"buyer", name: form.name, email: form.email });
+      await supabase.from("profiles").insert({ id: data.user.id, role:"buyer", name: form.name, email: form.email, phone: form.phone || null });
       await acceptInvite(data.user.id);
     }
     setSubmitting(false);
@@ -4380,7 +4433,7 @@ function InviteAcceptPage({ token, onAccepted }) {
             {/* Realtor card */}
             <div className="card" style={{ textAlign:"center", marginBottom:"1.5rem", background:"linear-gradient(135deg,rgba(194,113,79,0.07),rgba(194,113,79,0.03))", border:"1px solid rgba(194,113,79,0.2)" }}>
               <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c2714f,#a85c3a)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"1.1rem", color:"white", margin:"0 auto 1rem" }}>
-                {realtor?.name?.split(" ").map(n=>n[0]).join("").slice(0,2) || "??"}
+                {realtor?.name ? realtor.name.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase() : "HS"}
               </div>
               <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.25rem" }}>
                 {realtor?.name || "Your Realtor"} invited you
@@ -4432,6 +4485,7 @@ function InviteAcceptPage({ token, onAccepted }) {
               <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
                 <div className="field"><label>Full Name *</label><input className="text-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Jane Smith" /></div>
                 <div className="field"><label>Email *</label><input className="text-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="jane@email.com" /></div>
+                <div className="field"><label>Phone</label><input className="text-input" type="tel" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="(555) 000-0000" /></div>
                 <div className="field"><label>Password *</label><input className="text-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••••" /></div>
               </div>
               <button className="btn-primary" style={{ width:"100%", marginTop:"1.5rem", padding:"0.85rem", opacity:submitting?0.7:1 }} onClick={handleSignUp} disabled={submitting}>
@@ -4496,34 +4550,37 @@ export default function App() {
   const inviteToken = new URLSearchParams(window.location.search).get("invite");
 
   useEffect(() => {
-    // Check for existing session on load
+    let initialized = false;
+    // Check for existing session on load first
     supabase.auth.getSession().then(({ data: { session } }) => {
+      initialized = true;
       setSession(session);
       if (session) loadProfile(session.user.id);
       else setAuthLoading(false);
     });
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) loadProfile(session.user.id);
-      else { setProfile(null); setAuthLoading(false); }
+    // Only listen for SUBSEQUENT auth changes (sign in / sign out)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!initialized) return; // skip the initial event, handled by getSession above
+      if (event === "SIGNED_OUT") {
+        setSession(null); setProfile(null); setClientOnboarded(false); setAuthLoading(false);
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        setSession(session);
+        if (session) loadProfile(session.user.id);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
 
   const loadProfile = async (userId) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (!data) { setAuthLoading(false); return; }
     setProfile(data);
-    // Only mark as onboarded if they have previously completed onboarding
-    // Check realtor_clients to see if they came via invite (need onboarding)
-    if (data?.role === "buyer") {
-      const { data: clientLink } = await supabase
-        .from("realtor_clients")
-        .select("id")
-        .eq("client_id", userId)
-        .single();
-      // If they have a realtor link and onboarded flag not set, send to wizard
-      if (data?.onboarded) setClientOnboarded(true);
+    if (data.role === "buyer") {
+      if (data.onboarded) setClientOnboarded(true);
       else setClientOnboarded(false);
     }
     setAuthLoading(false);
