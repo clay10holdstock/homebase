@@ -4633,15 +4633,23 @@ export default function App() {
   );
 
   // Not logged in → show landing/auth
-  if (!session) return <AuthScreen onLogin={handleLogin} />;
+  // 1. Not logged in -> show landing/auth
+  if (!session && !authLoading) return <AuthScreen onLogin={handleLogin} />;
 
-  // Session exists but profile not yet loaded — keep showing loading
+  // 2. Logged in BUT profile not yet loaded -> show loading
   if (session && !profile) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0", fontFamily:"'DM Sans',sans-serif" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:"1rem" }}>HomeStart</div>
-        <div style={{ color:"#8a7968", fontSize:"0.9rem" }}>Loading your account...</div>
+        <div style={{ color:"#8a7968", fontSize:"0.9rem" }}>Fetching your professional profile...</div>
       </div>
+    </div>
+  );
+  
+  // 3. Global loading state for initial auth check
+  if (authLoading) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0" }}>
+       {/* Simple Loading Spinner or Text */}
     </div>
   );
 
