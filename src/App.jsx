@@ -4626,12 +4626,22 @@ export default function App() {
     </div>
   );
 
-  // Determine role — from Supabase profile if available, else from demo session
-  const role = profile?.role || session?.type;
-  const user = profile ? { ...profile, name: profile.name, email: profile.email } : session?.user;
-
   // Not logged in → show landing/auth
   if (!session) return <AuthScreen onLogin={handleLogin} />;
+
+  // Session exists but profile not yet loaded — keep showing loading
+  if (session && !profile) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f8f5f0", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:"1rem" }}>HomeStart</div>
+        <div style={{ color:"#8a7968", fontSize:"0.9rem" }}>Loading your account...</div>
+      </div>
+    </div>
+  );
+
+  // Determine role — from Supabase profile
+  const role = profile.role;
+  const user = { ...profile };
 
   // Lender → show lender portal
   if (role === "lender") return <LenderPortal user={user} onLogout={handleLogout} />;
