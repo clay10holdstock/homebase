@@ -505,31 +505,32 @@ function PreApprovalSection({ user, profile }) {
   ];
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      const price = parseFloat((form.propPrice || "0").replace(/[^0-9.]/g, "")) || 0;
-      const downPct = parseFloat(form.downPct) || 20;
-      const loanAmt = price * (1 - downPct / 100);
+  setSubmitting(true);
+  try {
+    if (user?.id) {
+      // 1. Update Profile with form data and status
+      const { error: profileErr } = await supabase.from("profiles").update({
+        pre_approval_status: "under_review",
+        pre_approval_submitted_at: new Date().toISOString(),
+        pre_approval_data: JSON.stringify(form),
+        assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015" // Hardcoded Lender
+      }).eq("id", user.id);
 
-      // Save pre-approval to Supabase profiles
-      if (user?.id) {
-        await supabase.from("profiles").update({
-          pre_approval_status: "under_review",
-          pre_approval_submitted_at: new Date().toISOString(),
-          pre_approval_data: JSON.stringify(form),
-        }).eq("id", user.id);
+      if (profileErr) throw profileErr;
 
-        // Update status in realtor_clients
-        await supabase.from("realtor_clients").update({
-          client_status: "Pre-Approval Review",
-        }).eq("client_id", user.id);
-      }
-    } catch(e) {
-      console.error("Pre-approval save error:", e);
+      // 2. Update Realtor's View
+      await supabase.from("realtor_clients").update({
+        client_status: "Pre-Approval Review",
+      }).eq("client_id", user.id);
+      
+      setSubmitted(true);
     }
+  } catch(e) {
+    console.error("Pre-approval save error:", e);
+  } finally {
     setSubmitting(false);
-    setSubmitted(true);
-  };
+  }
+};
 
   if (submitted) {
     const price = parseFloat((form.propPrice || "385000").replace(/[^0-9.]/g, "")) || 385000;
@@ -4372,17 +4373,35 @@ function InviteAcceptPage({ token, onAccepted }) {
   };
 
   const handleSignUp = async () => {
-    setFormError("");
-    if (!form.name || !form.email || !form.password) { setFormError("All fields are required."); return; }
-    setSubmitting(true);
-    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password });
-    if (error) { setFormError(error.message); setSubmitting(false); return; }
-    if (data.user) {
-      await supabase.from("profiles").insert({ id: data.user.id, role:"buyer", name: form.name, email: form.email, phone: form.phone || null });
-      await acceptInvite(data.user.id);
-    }
-    setSubmitting(false);
-  };
+  setFormError("");
+  if (!form.name || !form.email || !form.password) { setFormError("Fields required."); return; }
+  setSubmitting(true);
+  const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password });
+  if (error) { setFormError(error.message); setSubmitting(false); return; }
+  
+  if (data.user) {
+    // 1. Create Profile
+    await supabase.from("profiles").insert({ 
+      id: data.user.id, 
+      role: "buyer", 
+      name: form.name, 
+      onboarded: false // Ensure wizard triggers once
+    });
+
+    // 2. Link to Realtor & Update Invite Status
+    await supabase.from("realtor_clients").insert({ 
+      realtor_id: invite.realtor_id, 
+      client_id: data.user.id 
+    });
+
+    await supabase.from("invites").update({ 
+      status: "accepted", 
+      accepted_at: new Date().toISOString() 
+    }).eq("token", token);
+
+    window.location.href = "/"; // Force refresh to clear invite state
+  }
+};
 
   const handleLogin = async () => {
     setFormError("");
