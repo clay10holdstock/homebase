@@ -4572,11 +4572,17 @@ export default function App() {
   }, []);
 
   const loadProfile = async (userId) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
+    if (error) {
+      console.error("loadProfile error:", error);
+      // If profile doesn't exist yet, still clear loading so user isn't stuck
+      setAuthLoading(false);
+      return;
+    }
     if (!data) { setAuthLoading(false); return; }
     setProfile(data);
     if (data.role === "buyer") {
