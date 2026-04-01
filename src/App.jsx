@@ -507,26 +507,30 @@ function PreApprovalSection({ user, profile }) {
   const handleSubmit = async () => {
   setSubmitting(true);
   try {
-    if (user?.id) {
-      // 1. Update Profile with form data and status
-      const { error: profileErr } = await supabase.from("profiles").update({
-        pre_approval_status: "under_review",
-        pre_approval_submitted_at: new Date().toISOString(),
-        pre_approval_data: JSON.stringify(form),
-        assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015" // Hardcoded Lender
-      }).eq("id", user.id);
+    const userId = user?.id;
+    if (!userId) throw new Error("Not logged in");
 
-      if (profileErr) throw profileErr;
+    // 1. Update Profile with form data and status
+    const { error: profileErr } = await supabase.from("profiles").update({
+      pre_approval_status: "under_review",
+      pre_approval_submitted_at: new Date().toISOString(),
+      pre_approval_data: JSON.stringify(form),
+      first_name: form.firstName,
+      last_name: form.lastName,
+      assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015"
+    }).eq("id", userId);
 
-      // 2. Update Realtor's View
-      await supabase.from("realtor_clients").update({
-        client_status: "Pre-Approval Review",
-      }).eq("client_id", user.id);
-      
-      setSubmitted(true);
-    }
+    if (profileErr) throw profileErr;
+
+    // 2. Update Realtor's View
+    await supabase.from("realtor_clients").update({
+      client_status: "Pre-Approval Review",
+    }).eq("client_id", userId);
+
+    setSubmitted(true);
   } catch(e) {
     console.error("Pre-approval save error:", e);
+    alert("Submission failed: " + (e.message || "Unknown error. Check console."));
   } finally {
     setSubmitting(false);
   }
@@ -4166,7 +4170,7 @@ function LenderPortal({ user, onLogout }) {
                         const data = p.pre_approval_data ? JSON.parse(p.pre_approval_data) : {};
                         return (
                           <tr key={i}>
-                            <td style={{ fontWeight:600 }}>{p.name}</td>
+                            <td style={{ fontWeight:600 }}>{p.full_name || (p.first_name ? `${p.first_name} ${p.last_name || ""}`.trim() : p.email)}</td>
                             <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.email}</td>
                             <td><span className="mono">{data.income || "—"}</span></td>
                             <td><span className="mono">{data.propPrice || "—"}</span></td>
@@ -4684,7 +4688,6 @@ export default function App() {
 
   // Client not yet onboarded → show wizard
   if (role === "buyer" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
-  if (role === "client" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
 
   // Client onboarded → show main platform
   const NAV_ITEMS = BUYER_TABS;
