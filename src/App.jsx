@@ -421,87 +421,212 @@ function ShopLoansSection({ liveRates }) {
 }
 
 function PreApprovalSection({ user, profile }) {
-  // If profile already has a pre_approval_status, start in submitted state
-  const alreadySubmitted = !!profile?.pre_approval_status || profile?.pre_approval_status === "under_review";
+  const alreadySubmitted = !!profile?.pre_approval_status;
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({
-    firstName: (user?.name || "").split(" ")[0] || "",
-    lastName: (user?.name || "").split(" ").slice(1).join(" ") || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    income: "", employer: "", jobYears: "",
-    assets: "", creditScore: "",
-    // Co-applicant
-    hasCoApplicant: false,
-    coFirstName: "", coLastName: "", coIncome: "", coEmployer: "",
-    propPrice: "", propType: "Single Family", downPct: "20",
-    loanType: "Conventional 30-Year Fixed"
-  });
-  const [submitted, setSubmitted] = useState(alreadySubmitted);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(alreadySubmitted);
+  const [submittedData, setSubmittedData] = useState(null);
 
-  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const [form, setForm] = useState({
+    // Step 1 — Personal
+    firstName: (user?.name || "").split(" ")[0] || "",
+    lastName:  (user?.name || "").split(" ").slice(1).join(" ") || "",
+    email:     user?.email || "",
+    phone:     user?.phone || "",
+    dob:       "",
+    ssnLast4:  "",
+    citizenship: "US Citizen",
+    currentHousing: "Renting",
+    monthlyHousingPayment: "",
+    // Step 2 — Employment & Income
+    employmentType: "Full-Time Salaried",
+    employer: "", jobTitle: "", jobYears: "",
+    annualIncome: "", otherIncome: "", otherIncomeSource: "",
+    hasCoApplicant: false,
+    coFirstName: "", coLastName: "",
+    coEmploymentType: "Full-Time Salaried",
+    coEmployer: "", coJobTitle: "", coAnnualIncome: "",
+    // Step 3 — Monthly Debts
+    debtCarLoan: "", debtStudentLoan: "", debtCreditCard: "",
+    debtPersonalLoan: "", debtOther: "",
+    // Step 4 — Assets
+    checkingBalance: "", savingsBalance: "",
+    retirementBalance: "", otherAssets: "",
+    giftFunds: false, giftFundsAmount: "",
+    // Step 5 — Property & Goals
+    propPrice: "", downPct: "20", propType: "Single Family",
+    occupancy: "Primary Residence",
+    loanType: "Conventional 30-Year Fixed",
+    purchaseTimeline: "1-3 months",
+    hasBankruptcy: false, hasForeclosure: false,
+    creditScore: "",
+  });
 
-  const steps = [
-    {
-      title: "Personal Information",
-      fields: (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-          <div className="field"><label>First Name</label><input className="text-input" value={form.firstName} onChange={e => update("firstName", e.target.value)} placeholder="Jane" /></div>
-          <div className="field"><label>Last Name</label><input className="text-input" value={form.lastName} onChange={e => update("lastName", e.target.value)} placeholder="Smith" /></div>
-          <div className="field"><label>Email</label><input className="text-input" value={form.email} onChange={e => update("email", e.target.value)} placeholder="jane@example.com" /></div>
-          <div className="field"><label>Phone</label><input className="text-input" value={form.phone} onChange={e => update("phone", e.target.value)} placeholder="(555) 000-0000" /></div>
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const money = v => v ? "$" + parseFloat(v.replace(/[^0-9.]/g, "")).toLocaleString() : "";
+  const parseNum = v => parseFloat((v || "0").replace(/[^0-9.]/g, "")) || null;
+
+  const Field = ({ label, col2, children }) => (
+    <div style={{ gridColumn: col2 ? "1/-1" : "auto" }}>
+      <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem", fontWeight:500 }}>{label}</label>
+      {children}
+    </div>
+  );
+  const Input = ({ k, placeholder, type="text" }) => (
+    <input className="text-input" type={type} value={form[k]} onChange={e=>upd(k,e.target.value)} placeholder={placeholder} />
+  );
+  const Select = ({ k, opts }) => (
+    <select className="text-input" value={form[k]} onChange={e=>upd(k,e.target.value)}>
+      {opts.map(o => <option key={o}>{o}</option>)}
+    </select>
+  );
+  const Divider = ({ label }) => (
+    <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem", marginTop:"0.25rem", fontSize:"0.72rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700 }}>{label}</div>
+  );
+
+  const STEPS = [
+    { title:"Personal Information",    icon:"👤", desc:"Tell us about yourself" },
+    { title:"Employment & Income",     icon:"💼", desc:"Your job and earnings" },
+    { title:"Monthly Debts",           icon:"📊", desc:"Existing obligations" },
+    { title:"Assets & Savings",        icon:"🏦", desc:"What you have saved" },
+    { title:"Property & Loan Goals",   icon:"🏠", desc:"What you're looking for" },
+  ];
+
+  const stepContent = [
+    // ── Step 1: Personal ────────────────────────────────────────────────────
+    <div key="s1" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+      <Field label="First Name"><Input k="firstName" placeholder="Jane" /></Field>
+      <Field label="Last Name"><Input k="lastName" placeholder="Smith" /></Field>
+      <Field label="Email Address"><Input k="email" placeholder="jane@email.com" /></Field>
+      <Field label="Phone"><Input k="phone" placeholder="(555) 000-0000" /></Field>
+      <Field label="Date of Birth"><Input k="dob" type="date" /></Field>
+      <Field label="Last 4 of SSN">
+        <input className="text-input" type="password" maxLength={4} value={form.ssnLast4} onChange={e=>upd("ssnLast4",e.target.value.replace(/\D/g,""))} placeholder="••••" />
+      </Field>
+      <Field label="Citizenship / Residency"><Select k="citizenship" opts={["US Citizen","Permanent Resident (Green Card)","Work Visa (H-1B, L-1, etc.)","Other"]} /></Field>
+      <Field label="Current Housing"><Select k="currentHousing" opts={["Renting","Own with Mortgage","Own Free & Clear","Living with Family"]} /></Field>
+      <Field label="Monthly Housing Payment" col2>
+        <Input k="monthlyHousingPayment" placeholder="$1,800" />
+      </Field>
+      <div style={{ gridColumn:"1/-1", padding:"0.75rem 1rem", background:"rgba(47,111,168,0.07)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--blue)" }}>
+        🔒 Your SSN last 4 is used solely to authorize a credit inquiry. It is encrypted and never shared with third parties.
+      </div>
+    </div>,
+
+    // ── Step 2: Employment & Income ─────────────────────────────────────────
+    <div key="s2" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+      <Divider label="Primary Applicant" />
+      <Field label="Employment Type" col2><Select k="employmentType" opts={["Full-Time Salaried","Full-Time Hourly","Part-Time","Self-Employed / 1099","Contractor","Retired","Other"]} /></Field>
+      <Field label="Employer / Company"><Input k="employer" placeholder="Acme Corp" /></Field>
+      <Field label="Job Title"><Input k="jobTitle" placeholder="Software Engineer" /></Field>
+      <Field label="Years at Current Job"><Input k="jobYears" placeholder="3.5" /></Field>
+      <Field label="Annual Gross Income"><Input k="annualIncome" placeholder="$85,000" /></Field>
+      <Field label="Other Monthly Income"><Input k="otherIncome" placeholder="$0" /></Field>
+      <Field label="Other Income Source"><Input k="otherIncomeSource" placeholder="Rental income, alimony, etc." /></Field>
+      <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem" }}>
+        <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem", fontWeight:500 }}>
+          <input type="checkbox" checked={form.hasCoApplicant} onChange={e=>upd("hasCoApplicant",e.target.checked)} style={{ width:"16px", height:"16px" }} />
+          Add a spouse or co-applicant
+        </label>
+      </div>
+      {form.hasCoApplicant && <>
+        <Divider label="Co-Applicant" />
+        <Field label="First Name"><Input k="coFirstName" placeholder="John" /></Field>
+        <Field label="Last Name"><Input k="coLastName" placeholder="Smith" /></Field>
+        <Field label="Employment Type" col2><Select k="coEmploymentType" opts={["Full-Time Salaried","Full-Time Hourly","Part-Time","Self-Employed / 1099","Contractor","Retired","Other"]} /></Field>
+        <Field label="Employer"><Input k="coEmployer" placeholder="Corp Inc" /></Field>
+        <Field label="Job Title"><Input k="coJobTitle" placeholder="Teacher" /></Field>
+        <Field label="Annual Gross Income"><Input k="coAnnualIncome" placeholder="$65,000" /></Field>
+      </>}
+    </div>,
+
+    // ── Step 3: Monthly Debts ───────────────────────────────────────────────
+    <div key="s3" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+      <Field label="Car Loan / Auto Payment"><Input k="debtCarLoan" placeholder="$0 / month" /></Field>
+      <Field label="Student Loan Payment"><Input k="debtStudentLoan" placeholder="$0 / month" /></Field>
+      <Field label="Credit Card Minimums"><Input k="debtCreditCard" placeholder="$0 / month" /></Field>
+      <Field label="Personal Loan Payment"><Input k="debtPersonalLoan" placeholder="$0 / month" /></Field>
+      <Field label="Other Monthly Debt" col2><Input k="debtOther" placeholder="$0 / month" /></Field>
+      <div style={{ gridColumn:"1/-1" }}>
+        {(() => {
+          const total = [form.debtCarLoan, form.debtStudentLoan, form.debtCreditCard, form.debtPersonalLoan, form.debtOther]
+            .map(v => parseFloat((v||"0").replace(/[^0-9.]/g,""))||0).reduce((a,b)=>a+b,0);
+          const monthlyIncome = (parseNum(form.annualIncome)||0) / 12;
+          const dti = monthlyIncome > 0 ? Math.round((total / monthlyIncome) * 100) : null;
+          return total > 0 ? (
+            <div style={{ padding:"0.85rem 1rem", background: dti > 43 ? "rgba(192,57,43,0.07)" : dti > 36 ? "rgba(194,122,26,0.07)" : "rgba(61,125,90,0.07)", borderRadius:"8px", border:`1px solid ${dti > 43 ? "rgba(192,57,43,0.2)" : dti > 36 ? "rgba(194,122,26,0.2)" : "rgba(61,125,90,0.2)"}`, fontSize:"0.85rem", color: dti > 43 ? "var(--red)" : dti > 36 ? "var(--amber)" : "var(--green)" }}>
+              Total monthly debt: <strong>{formatCurrency(total)}/mo</strong>
+              {dti !== null && <span style={{ marginLeft:"1rem" }}>Estimated back-end DTI: <strong>{dti}%</strong> {dti <= 36 ? "✓ Good" : dti <= 43 ? "⚠ Borderline" : "✗ High"}</span>}
+            </div>
+          ) : null;
+        })()}
+      </div>
+      <div style={{ gridColumn:"1/-1", padding:"0.75rem 1rem", background:"var(--surface)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--muted)" }}>
+        💡 List minimum required monthly payments only — not extra amounts you voluntarily pay.
+      </div>
+    </div>,
+
+    // ── Step 4: Assets ──────────────────────────────────────────────────────
+    <div key="s4" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+      <Field label="Checking Account Balance"><Input k="checkingBalance" placeholder="$8,000" /></Field>
+      <Field label="Savings Account Balance"><Input k="savingsBalance" placeholder="$40,000" /></Field>
+      <Field label="Retirement / 401(k) / IRA"><Input k="retirementBalance" placeholder="$80,000" /></Field>
+      <Field label="Other Assets (stocks, etc.)"><Input k="otherAssets" placeholder="$0" /></Field>
+      <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem" }}>
+        <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem", fontWeight:500 }}>
+          <input type="checkbox" checked={form.giftFunds} onChange={e=>upd("giftFunds",e.target.checked)} style={{ width:"16px", height:"16px" }} />
+          I am receiving gift funds toward my down payment
+        </label>
+      </div>
+      {form.giftFunds && <Field label="Gift Fund Amount" col2><Input k="giftFundsAmount" placeholder="$10,000" /></Field>}
+      {form.giftFunds && (
+        <div style={{ gridColumn:"1/-1", padding:"0.75rem 1rem", background:"rgba(194,122,26,0.07)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--amber)" }}>
+          ⚠ Gift funds require a signed gift letter from the donor. Your loan officer will follow up on this.
         </div>
-      )
-    },
-    {
-      title: "Employment & Income",
-      fields: (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-          <div className="field" style={{ gridColumn:"1/-1" }}><label>Employer Name</label><input className="text-input" value={form.employer} onChange={e => update("employer", e.target.value)} placeholder="Acme Corp" /></div>
-          <div className="field"><label>Annual Gross Income</label><input className="text-input" value={form.income} onChange={e => update("income", e.target.value)} placeholder="$85,000" /></div>
-          <div className="field"><label>Years at Job</label><input className="text-input" value={form.jobYears} onChange={e => update("jobYears", e.target.value)} placeholder="3" /></div>
-          <div className="field"><label>Total Assets / Savings</label><input className="text-input" value={form.assets} onChange={e => update("assets", e.target.value)} placeholder="$50,000" /></div>
-          <div className="field"><label>Estimated Credit Score</label><input className="text-input" value={form.creditScore} onChange={e => update("creditScore", e.target.value)} placeholder="720" /></div>
-          <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem", marginTop:"0.25rem" }}>
-            <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem", fontWeight:500 }}>
-              <input type="checkbox" checked={form.hasCoApplicant} onChange={e=>update("hasCoApplicant",e.target.checked)} style={{ width:"16px", height:"16px" }} />
-              Adding a spouse or co-applicant
-            </label>
-          </div>
-          {form.hasCoApplicant && <>
-            <div style={{ gridColumn:"1/-1", fontSize:"0.78rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:600, marginTop:"0.25rem" }}>Co-Applicant</div>
-            <div className="field"><label>First Name</label><input className="text-input" value={form.coFirstName} onChange={e=>update("coFirstName",e.target.value)} placeholder="John" /></div>
-            <div className="field"><label>Last Name</label><input className="text-input" value={form.coLastName} onChange={e=>update("coLastName",e.target.value)} placeholder="Smith" /></div>
-            <div className="field"><label>Employer</label><input className="text-input" value={form.coEmployer} onChange={e=>update("coEmployer",e.target.value)} placeholder="Corp Inc" /></div>
-            <div className="field"><label>Annual Gross Income</label><input className="text-input" value={form.coIncome} onChange={e=>update("coIncome",e.target.value)} placeholder="$65,000" /></div>
-          </>}
+      )}
+      <div style={{ gridColumn:"1/-1" }}>
+        {(() => {
+          const liquid = (parseNum(form.checkingBalance)||0) + (parseNum(form.savingsBalance)||0);
+          return liquid > 0 ? (
+            <div style={{ padding:"0.85rem 1rem", background:"rgba(61,125,90,0.06)", borderRadius:"8px", border:"1px solid rgba(61,125,90,0.15)", fontSize:"0.85rem", color:"var(--green)" }}>
+              Total liquid assets: <strong>{formatCurrency(liquid)}</strong>
+            </div>
+          ) : null;
+        })()}
+      </div>
+    </div>,
+
+    // ── Step 5: Property & Goals ────────────────────────────────────────────
+    <div key="s5" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+      <Field label="Target Purchase Price"><Input k="propPrice" placeholder="$400,000" /></Field>
+      <Field label="Down Payment (%)"><Select k="downPct" opts={["3","3.5","5","10","15","20","25","30"]} /></Field>
+      <Field label="Property Type"><Select k="propType" opts={["Single Family","Condo / Townhome","Multi-Family (2–4 units)","Manufactured Home"]} /></Field>
+      <Field label="Intended Occupancy"><Select k="occupancy" opts={["Primary Residence","Second Home / Vacation","Investment Property"]} /></Field>
+      <Field label="Loan Type"><Select k="loanType" opts={["Conventional 30-Year Fixed","Conventional 15-Year Fixed","FHA 30-Year Fixed","VA 30-Year Fixed","USDA","Jumbo","Not sure — advise me"]} /></Field>
+      <Field label="Purchase Timeline"><Select k="purchaseTimeline" opts={["ASAP","1-3 months","3-6 months","6-12 months","Just exploring"]} /></Field>
+      <Field label="Estimated Credit Score"><Select k="creditScore" opts={["760+","720–759","680–719","640–679","600–639","Below 600","Not sure"]} /></Field>
+      <div style={{ gridColumn:"1/-1", borderTop:"1px solid var(--border)", paddingTop:"1rem" }}>
+        <div style={{ fontSize:"0.78rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"0.75rem" }}>Credit History Disclosures</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem" }}>
+            <input type="checkbox" checked={form.hasBankruptcy} onChange={e=>upd("hasBankruptcy",e.target.checked)} style={{ width:"16px", height:"16px" }} />
+            I have filed for bankruptcy in the last 7 years
+          </label>
+          <label style={{ display:"flex", alignItems:"center", gap:"0.75rem", cursor:"pointer", fontSize:"0.9rem" }}>
+            <input type="checkbox" checked={form.hasForeclosure} onChange={e=>upd("hasForeclosure",e.target.checked)} style={{ width:"16px", height:"16px" }} />
+            I have had a foreclosure in the last 7 years
+          </label>
         </div>
-      )
-    },
-    {
-      title: "Property Details",
-      fields: (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-          <div className="field"><label>Purchase Price</label><input className="text-input" value={form.propPrice} onChange={e => update("propPrice", e.target.value)} placeholder="$385,000" /></div>
-          <div className="field"><label>Down Payment (%)</label>
-            <select className="text-input" value={form.downPct} onChange={e => update("downPct", e.target.value)}>
-              {["3","5","10","15","20","25"].map(v => <option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div className="field"><label>Property Type</label>
-            <select className="text-input" value={form.propType} onChange={e => update("propType", e.target.value)}>
-              {["Single Family","Condo","Townhouse","Multi-Family"].map(v => <option key={v}>{v}</option>)}
-            </select>
-          </div>
-          <div className="field"><label>Loan Type</label>
-            <select className="text-input" value={form.loanType} onChange={e => update("loanType", e.target.value)}>
-              {["Conventional 30-Year Fixed","Conventional 15-Year Fixed","FHA 30-Year","VA 30-Year","Jumbo"].map(v => <option key={v}>{v}</option>)}
-            </select>
-          </div>
+      </div>
+      {(form.hasBankruptcy || form.hasForeclosure) && (
+        <div style={{ gridColumn:"1/-1", padding:"0.75rem 1rem", background:"rgba(194,122,26,0.07)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--amber)" }}>
+          ⚠ These may affect loan eligibility. Your loan officer will review your specific circumstances — many borrowers with prior events still qualify.
         </div>
-      )
-    }
+      )}
+      <div style={{ gridColumn:"1/-1", padding:"0.75rem 1rem", background:"rgba(61,125,90,0.06)", borderRadius:"8px", fontSize:"0.82rem", color:"var(--green)", borderLeft:"3px solid var(--green)" }}>
+        ✓ By submitting you authorize HomeStart to perform a soft credit inquiry. A hard inquiry will only occur with your explicit consent before final approval.
+      </div>
+    </div>,
   ];
 
   const handleSubmit = async () => {
@@ -510,9 +635,6 @@ function PreApprovalSection({ user, profile }) {
       const userId = user?.id;
       if (!userId) throw new Error("Not logged in");
 
-      const price = parseFloat((form.propPrice || "0").replace(/[^0-9.]/g, "")) || null;
-
-      // 1. Upsert into pre_approval_applications (one row per user)
       const { error: appErr } = await supabase
         .from("pre_approval_applications")
         .upsert({
@@ -520,142 +642,173 @@ function PreApprovalSection({ user, profile }) {
           assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015",
           status: "under_review",
           submitted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
           first_name: form.firstName,
           last_name: form.lastName,
           email: form.email,
           phone: form.phone || null,
+          date_of_birth: form.dob || null,
+          ssn_last4: form.ssnLast4 || null,
+          citizenship: form.citizenship,
+          current_housing: form.currentHousing,
+          monthly_housing_payment: parseNum(form.monthlyHousingPayment),
+          employment_type: form.employmentType,
           employer: form.employer || null,
+          job_title: form.jobTitle || null,
           job_years: form.jobYears || null,
-          annual_income: parseFloat((form.income || "0").replace(/[^0-9.]/g, "")) || null,
-          assets: parseFloat((form.assets || "0").replace(/[^0-9.]/g, "")) || null,
-          credit_score: parseFloat(form.creditScore) || null,
-          has_co_applicant: form.hasCoApplicant || false,
+          annual_income: parseNum(form.annualIncome),
+          other_income: parseNum(form.otherIncome),
+          other_income_source: form.otherIncomeSource || null,
+          has_co_applicant: form.hasCoApplicant,
           co_first_name: form.hasCoApplicant ? form.coFirstName : null,
           co_last_name: form.hasCoApplicant ? form.coLastName : null,
+          co_employment_type: form.hasCoApplicant ? form.coEmploymentType : null,
           co_employer: form.hasCoApplicant ? form.coEmployer : null,
-          co_income: form.hasCoApplicant ? parseFloat((form.coIncome || "0").replace(/[^0-9.]/g, "")) || null : null,
-          purchase_price: price,
-          property_type: form.propType || null,
+          co_job_title: form.hasCoApplicant ? form.coJobTitle : null,
+          co_income: form.hasCoApplicant ? parseNum(form.coAnnualIncome) : null,
+          debt_car_loan: parseNum(form.debtCarLoan),
+          debt_student_loan: parseNum(form.debtStudentLoan),
+          debt_credit_card: parseNum(form.debtCreditCard),
+          debt_personal_loan: parseNum(form.debtPersonalLoan),
+          debt_other: parseNum(form.debtOther),
+          checking_balance: parseNum(form.checkingBalance),
+          savings_balance: parseNum(form.savingsBalance),
+          retirement_balance: parseNum(form.retirementBalance),
+          other_assets: parseNum(form.otherAssets),
+          gift_funds: form.giftFunds,
+          gift_funds_amount: form.giftFunds ? parseNum(form.giftFundsAmount) : null,
+          purchase_price: parseNum(form.propPrice),
+          property_type: form.propType,
           down_payment_pct: parseFloat(form.downPct) || null,
-          loan_type: form.loanType || null,
+          occupancy: form.occupancy,
+          loan_type: form.loanType,
+          purchase_timeline: form.purchaseTimeline,
+          credit_score_range: form.creditScore,
+          has_bankruptcy: form.hasBankruptcy,
+          has_foreclosure: form.hasForeclosure,
         }, { onConflict: "user_id" });
 
       if (appErr) throw appErr;
 
-      // 2. Mark profile as having submitted pre-approval
       await supabase.from("profiles").update({
         pre_approval_status: "under_review",
         pre_approval_submitted_at: new Date().toISOString(),
+        onboarded: true,
       }).eq("id", userId);
 
-      // 3. Update realtor client status
       await supabase.from("realtor_clients").update({
         client_status: "Pre-Approval Review",
       }).eq("client_id", userId);
 
+      setSubmittedData({ ...form });
       setSubmitted(true);
     } catch(e) {
-      console.error("Pre-approval save error:", e);
-      alert("Submission failed: " + (e.message || "Unknown error. Check console."));
+      console.error("Pre-approval error:", e);
+      alert("Submission failed: " + (e.message || "Check console for details."));
     } finally {
       setSubmitting(false);
     }
   };
 
+  // ── Under Review screen ──────────────────────────────────────────────────
   if (submitted) {
-    const price = parseFloat((form.propPrice || "385000").replace(/[^0-9.]/g, "")) || 385000;
-    const downPct = parseFloat(form.downPct) || 20;
+    const data = submittedData || {};
+    const price = parseNum(data.propPrice) || 0;
+    const downPct = parseFloat(data.downPct) || 20;
     const loanAmt = price * (1 - downPct / 100);
+    const annualInc = parseNum(data.annualIncome) || 0;
+    const coInc = data.hasCoApplicant ? (parseNum(data.coAnnualIncome) || 0) : 0;
+    const totalDebt = [data.debtCarLoan, data.debtStudentLoan, data.debtCreditCard, data.debtPersonalLoan, data.debtOther]
+      .map(v => parseNum(v)||0).reduce((a,b)=>a+b,0);
+    const monthlyIncome = (annualInc + coInc) / 12;
+    const dti = monthlyIncome > 0 ? Math.round((totalDebt / monthlyIncome) * 100) : null;
 
     return (
-      <div style={{ maxWidth: "640px", margin: "0 auto" }}>
-        {/* Under Review Banner */}
-        <div style={{ background:"linear-gradient(135deg,rgba(47,111,168,0.1),rgba(47,111,168,0.05))", border:"1px solid rgba(47,111,168,0.25)", borderRadius:"16px", padding:"2rem", textAlign:"center", marginBottom:"1.5rem" }}>
+      <div style={{ maxWidth:"680px", margin:"0 auto" }}>
+        <div style={{ background:"linear-gradient(135deg,rgba(47,111,168,0.1),rgba(47,111,168,0.04))", border:"1px solid rgba(47,111,168,0.2)", borderRadius:"16px", padding:"2.5rem", textAlign:"center", marginBottom:"1.5rem" }}>
           <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>⏳</div>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, marginBottom:"0.5rem", color:"var(--blue)" }}>Application Under Review</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--blue)", marginBottom:"0.5rem" }}>Application Under Review</div>
           <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
-            Your pre-approval application has been submitted. A HomeStart loan officer will review your information and get back to you within <strong>1–2 business days</strong>.
+            Your pre-approval application has been submitted to your loan officer. You'll hear back within <strong>1–2 business days</strong>.
           </div>
         </div>
 
-        {/* Summary of what was submitted */}
-        <div className="card">
-          <div className="section-label">What You Submitted</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem", marginBottom:"1.25rem" }}>
           {[
-            ["Name", `${form.firstName} ${form.lastName}`],
-            ["Email", form.email],
-            ["Employer", form.employer || "—"],
-            ["Annual Income", form.income || "—"],
-            ["Purchase Price", form.propPrice || "—"],
-            ["Down Payment", `${form.downPct}%`],
-            ["Loan Type", form.loanType],
-            ["Estimated Loan Amount", formatCurrency(loanAmt)],
-          ].map(([k,v],i) => (
+            ["Loan Amount", loanAmt > 0 ? formatCurrency(loanAmt) : "—", "var(--accent)"],
+            ["Down Payment", price > 0 ? `${formatCurrency(price * downPct / 100)} (${downPct}%)` : "—", "var(--text)"],
+            ["Combined Income", (annualInc + coInc) > 0 ? `${formatCurrency(annualInc + coInc)}/yr` : "—", "var(--green)"],
+            ["Est. Back-End DTI", dti !== null ? `${dti}%` : "—", dti > 43 ? "var(--red)" : dti > 36 ? "var(--amber)" : "var(--green)"],
+          ].map(([label, value, color], i) => (
+            <div key={i} className="card" style={{ textAlign:"center", padding:"1.25rem" }}>
+              <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.08em", color:"var(--muted)", marginBottom:"0.35rem" }}>{label}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.4rem", fontWeight:700, color }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="card" style={{ marginBottom:"1rem" }}>
+          <div className="section-label">Submitted Details</div>
+          {[
+            ["Applicant", `${data.firstName || ""} ${data.lastName || ""}`.trim() || "—"],
+            ["Loan Type", data.loanType || "—"],
+            ["Property Type", data.propType || "—"],
+            ["Occupancy", data.occupancy || "—"],
+            ["Purchase Timeline", data.purchaseTimeline || "—"],
+            ["Credit Score Range", data.creditScore || "—"],
+            ...(data.hasCoApplicant ? [["Co-Applicant", `${data.coFirstName || ""} ${data.coLastName || ""}`.trim() || "—"]] : []),
+          ].map(([k,v], i) => (
             <div key={i} className="breakdown-row"><span>{k}</span><span style={{ color:"var(--text)", fontWeight:500 }}>{v}</span></div>
           ))}
         </div>
 
-        <div style={{ marginTop:"1rem", padding:"0.85rem 1rem", background:"rgba(61,125,90,0.07)", borderRadius:"10px", border:"1px solid rgba(61,125,90,0.2)", fontSize:"0.85rem", color:"var(--green)", textAlign:"center" }}>
-          ✓ Your realtor has been notified that your application is under review.
+        <div style={{ padding:"0.85rem 1rem", background:"rgba(61,125,90,0.07)", borderRadius:"10px", border:"1px solid rgba(61,125,90,0.2)", fontSize:"0.85rem", color:"var(--green)", textAlign:"center" }}>
+          ✓ Your realtor has been notified. You will receive an email when a decision is made.
         </div>
       </div>
     );
   }
 
+  // ── Form ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: "640px", margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem" }}>
-        {steps.map((s, i) => (
-          <div key={i} style={{ flex: 1, height: "4px", borderRadius: "2px", background: i <= step ? "var(--accent)" : "var(--border)", transition: "background 0.3s" }} />
+    <div style={{ maxWidth:"680px", margin:"0 auto" }}>
+      {/* Progress bar */}
+      <div style={{ display:"flex", gap:"0.35rem", marginBottom:"1.5rem" }}>
+        {STEPS.map((s, i) => (
+          <div key={i} style={{ flex:1 }}>
+            <div style={{ height:"4px", borderRadius:"2px", background: i < step ? "var(--green)" : i === step ? "var(--accent)" : "var(--border)", transition:"background 0.3s", marginBottom:"0.4rem" }} />
+            <div style={{ fontSize:"0.65rem", color: i === step ? "var(--text)" : "var(--muted)", fontWeight: i === step ? 700 : 400, textAlign:"center", display:"none" }}>{s.title}</div>
+          </div>
         ))}
       </div>
+
       <div className="card">
-        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.4rem", marginBottom: "0.25rem" }}>Step {step + 1} of {steps.length}</h3>
-        <div style={{ color: "var(--muted)", marginBottom: "1.5rem" }}>{steps[step].title}</div>
-        {steps[step].fields}
-        <div style={{ display: "flex", gap: "1rem", marginTop: "2rem", justifyContent: "flex-end" }}>
-          {step > 0 && <button className="btn-secondary" onClick={() => setStep(s => s - 1)}>← Back</button>}
-          {step < steps.length - 1
-            ? <button className="btn-primary" onClick={() => setStep(s => s + 1)}>Continue →</button>
-            : <button className="btn-primary" style={{ opacity:submitting?0.7:1 }} disabled={submitting} onClick={handleSubmit}>
-                {submitting ? "Submitting..." : "Submit for Pre-Approval ✦"}
-              </button>
-          }
+        <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1.5rem" }}>
+          <span style={{ fontSize:"1.5rem" }}>{STEPS[step].icon}</span>
+          <div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.25rem", fontWeight:700 }}>{STEPS[step].title}</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.85rem" }}>{STEPS[step].desc} · Step {step+1} of {STEPS.length}</div>
+          </div>
+        </div>
+
+        {stepContent[step]}
+
+        <div style={{ display:"flex", gap:"1rem", marginTop:"2rem", justifyContent:"space-between", borderTop:"1px solid var(--border)", paddingTop:"1.25rem" }}>
+          <div>{step > 0 && <button className="btn-secondary" onClick={() => setStep(s => s - 1)}>← Back</button>}</div>
+          <div>
+            {step < STEPS.length - 1
+              ? <button className="btn-primary" onClick={() => setStep(s => s + 1)}>Continue →</button>
+              : <button className="btn-primary" style={{ opacity:submitting?0.7:1, background:"linear-gradient(135deg,var(--green),#2d6648)" }} disabled={submitting} onClick={handleSubmit}>
+                  {submitting ? "Submitting..." : "Submit Application ✦"}
+                </button>
+            }
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// =============================================
-// AUTH & PORTAL SYSTEM
-// =============================================
-
-const MOCK_DB = {
-  realtors: [
-    { id: "r1", email: "sarah@austinrealty.com", password: "demo", name: "Sarah Connelly", brokerage: "Austin Premier Realty", phone: "(512) 555-0182", license: "TX-589234", avatar: "SC", clients: ["c1","c2","c3"] }
-  ],
-  clients: [
-    { id: "c1", email: "james@email.com", password: "demo", name: "James Torres", phone: "(512) 555-0291", realtorId: "r1", onboarded: true, status: "Under Contract", statusStep: 3, loanAmount: 340000, loanType: "30-Year Fixed", rate: 6.875, preApprovalDate: "2025-02-10", preApprovalExpiry: "2025-05-10", income: 92000, creditScore: 724, downPct: 10, flags: [] },
-    { id: "c2", email: "priya@email.com", password: "demo", name: "Priya Sharma", phone: "(512) 555-0344", realtorId: "r1", onboarded: true, status: "Documents Needed", statusStep: 2, loanAmount: 420000, loanType: "30-Year Fixed", rate: null, preApprovalDate: null, preApprovalExpiry: null, income: 118000, creditScore: 698, downPct: 20, flags: ["Missing W2", "Bank statements needed"] },
-    { id: "c3", email: "mike@email.com", password: "demo", name: "Mike Okafor", phone: "(512) 555-0417", realtorId: "r1", onboarded: false, status: "Invited", statusStep: 0, loanAmount: null, loanType: null, rate: null, preApprovalDate: null, preApprovalExpiry: null, income: null, creditScore: null, downPct: null, flags: [] },
-  ],
-  leads: [],
-  lenders: [
-    { id: "lo1", email: "admin@homestart.com", password: "demo", name: "David Chen", title: "Senior Loan Officer", nmls: "NMLS #1234567", avatar: "DC" }
-  ],
-  loanApplications: [
-    { id: "la1", clientId: "c1", clientName: "James Torres", realtorName: "Sarah Connelly", brokerage: "Austin Premier Realty", status: "Application Review", submittedDate: "2025-03-01", loanType: "Conventional 30-Year Fixed", loanAmount: 306000, purchasePrice: 340000, downPct: 10, downAmount: 34000, ltv: 90, propertyAddress: "142 Maple Grove Dr", propertyCity: "Austin", propertyState: "TX", propertyZip: "78701", propertyType: "Single Family", closingDate: "2025-04-15", employerName: "Vertex Technologies", jobTitle: "Software Engineer", employmentType: "Full-Time Salaried", yearsAtJob: 4, annualIncome: 92000, monthlyIncome: 7667, otherIncome: 0, checkingBalance: 12400, savingsBalance: 48000, retirementBalance: 67000, carPayment: 380, studentLoan: 0, creditCardMin: 75, otherDebt: 0, totalMonthlyDebt: 455, creditScore: 724, dti: 38.2, estRate: 6.875, estMonthlyPayment: 2014, firstTimeBuyer: true, usCitizen: true, giftFunds: false, flags: [], docs: [ { name: "W-2 (2024)", status: "received" }, { name: "W-2 (2023)", status: "received" }, { name: "Pay Stubs (last 30 days)", status: "received" }, { name: "Bank Statements (2 mo)", status: "received" }, { name: "Purchase Contract", status: "received" }, { name: "Photo ID", status: "received" }, { name: "Tax Returns (2yr)", status: "pending" } ], notes: "" },
-    { id: "la2", clientId: "c2", clientName: "Priya Sharma", realtorName: "Sarah Connelly", brokerage: "Austin Premier Realty", status: "Pre-Approval Review", submittedDate: "2025-02-20", loanType: "Conventional 30-Year Fixed", loanAmount: 336000, purchasePrice: 420000, downPct: 20, downAmount: 84000, ltv: 80, propertyAddress: "TBD", propertyCity: "Austin", propertyState: "TX", propertyZip: "", propertyType: "Single Family", closingDate: null, employerName: "Dell Technologies", jobTitle: "Product Manager", employmentType: "Full-Time Salaried", yearsAtJob: 6, annualIncome: 118000, monthlyIncome: 9833, otherIncome: 0, checkingBalance: 28000, savingsBalance: 95000, retirementBalance: 142000, carPayment: 0, studentLoan: 520, creditCardMin: 120, otherDebt: 0, totalMonthlyDebt: 640, creditScore: 698, dti: 32.1, estRate: 7.0, estMonthlyPayment: 2236, firstTimeBuyer: false, usCitizen: true, giftFunds: false, flags: ["Missing W2", "Bank statements needed"], docs: [ { name: "W-2 (2024)", status: "missing" }, { name: "W-2 (2023)", status: "received" }, { name: "Pay Stubs (last 30 days)", status: "received" }, { name: "Bank Statements (2 mo)", status: "missing" }, { name: "Purchase Contract", status: "n/a" }, { name: "Photo ID", status: "received" }, { name: "Tax Returns (2yr)", status: "received" } ], notes: "Borrower traveling — expects to submit missing docs by 3/10." },
-    { id: "la3", clientId: "c4", clientName: "Marcus Webb", realtorName: "Marcus Webb Realty", brokerage: "Lone Star Properties", status: "Approved", submittedDate: "2025-01-15", loanType: "Jumbo 30-Year Fixed", loanAmount: 920000, purchasePrice: 1150000, downPct: 20, downAmount: 230000, ltv: 80, propertyAddress: "89 Sunset Blvd", propertyCity: "Austin", propertyState: "TX", propertyZip: "78746", propertyType: "Single Family", closingDate: "2025-03-28", employerName: "Self / Webb Capital LLC", jobTitle: "Principal", employmentType: "Self-Employed", yearsAtJob: 11, annualIncome: 340000, monthlyIncome: 28333, otherIncome: 4200, checkingBalance: 180000, savingsBalance: 620000, retirementBalance: 890000, carPayment: 1200, studentLoan: 0, creditCardMin: 400, otherDebt: 0, totalMonthlyDebt: 1600, creditScore: 791, dti: 28.4, estRate: 7.25, estMonthlyPayment: 6272, firstTimeBuyer: false, usCitizen: true, giftFunds: false, flags: [], docs: [ { name: "W-2 / K-1 (2024)", status: "received" }, { name: "W-2 / K-1 (2023)", status: "received" }, { name: "Pay Stubs / P&L", status: "received" }, { name: "Bank Statements (2 mo)", status: "received" }, { name: "Purchase Contract", status: "received" }, { name: "Photo ID", status: "received" }, { name: "Tax Returns (2yr)", status: "received" } ], notes: "Jumbo approved. Clear to close pending final appraisal." },
-    { id: "la4", clientId: "c5", clientName: "Aisha Johnson", realtorName: "Diana Flores", brokerage: "Casas del Sol Realty", status: "Suspended", submittedDate: "2025-02-05", loanType: "FHA 30-Year Fixed", loanAmount: 229500, purchasePrice: 245000, downPct: 6.3, downAmount: 15500, ltv: 93.7, propertyAddress: "55 Pinecrest Ave", propertyCity: "Austin", propertyState: "TX", propertyZip: "78704", propertyType: "Condo / Townhome", closingDate: "2025-04-01", employerName: "Austin ISD", jobTitle: "Teacher", employmentType: "Full-Time Salaried", yearsAtJob: 3, annualIncome: 54000, monthlyIncome: 4500, otherIncome: 0, checkingBalance: 8200, savingsBalance: 18000, retirementBalance: 12000, carPayment: 0, studentLoan: 310, creditCardMin: 90, otherDebt: 0, totalMonthlyDebt: 400, creditScore: 631, dti: 41.8, estRate: 7.5, estMonthlyPayment: 1607, firstTimeBuyer: true, usCitizen: true, giftFunds: true, flags: ["Credit score below FHA preferred threshold", "DTI approaching limit"], docs: [ { name: "W-2 (2024)", status: "received" }, { name: "W-2 (2023)", status: "received" }, { name: "Pay Stubs (last 30 days)", status: "received" }, { name: "Bank Statements (2 mo)", status: "received" }, { name: "Gift Letter", status: "missing" }, { name: "Photo ID", status: "received" }, { name: "Tax Returns (2yr)", status: "received" } ], notes: "Suspended pending gift letter and credit explanation letter." },
-  ]
-};
-
-const STATUS_STEPS = ["Invited","Account Created","Documents Needed","Pre-Approved","Under Contract","Closed"];
-const STATUS_COLORS = { "Invited":"#a0927e","Account Created":"var(--blue)","Documents Needed":"var(--amber)","Pre-Approved":"var(--green)","Under Contract":"var(--accent)","Closed":"var(--green)" };
-
-const PORTAL_CSS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap'); *{box-sizing:border-box;margin:0;padding:0} body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif} :root{--bg:#f8f5f0;--card:#ffffff;--card-bg-2:#f9f7f4;--border:#e8e0d6;--accent:#c2714f;--accent2:#a85c3a;--text:#2d2418;--muted:#8a7968;--green:#3d7d5a;--red:#c0392b} .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;box-shadow:0 1px 4px rgba(44,32,18,0.06)} .btn-primary{background:linear-gradient(135deg,#c2714f,#a85c3a);color:white;border:none;padding:0.6rem 1.4rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer} .btn-secondary{background:white;color:var(--text);border:1px solid var(--border);padding:0.6rem 1.4rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer} .section-label{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:1rem} .breakdown-row{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f0ebe3;font-size:0.9rem;color:var(--muted)} .breakdown-row span:last-child{color:var(--text);font-weight:500} .text-input{width:100%;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;outline:none} .field label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.4rem;font-weight:500}`;
 
 function AuthScreen({ onLogin }) {
   const [view, setView] = useState("landing");
@@ -1419,115 +1572,6 @@ function RealtorPortal({ user, onLogout }) {
   );
 }
 
-function ClientOnboardingWizard({ user, onComplete }) {
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ firstName:user.name.split(" ")[0]||"", lastName:user.name.split(" ").slice(1).join(" ")||"", phone:user.phone||"", dob:"", employer:"", jobTitle:"", jobYears:"", income:"", incomeType:"Salary", checkingBalance:"", savingsBalance:"", otherAssets:"", purchasePrice:"", propType:"Single Family", downPct:"10", loanType:"Conventional 30-Year Fixed", estimatedScore:"", monthlyDebt:"", hasBankruptcy:"No", hasForeclosure:"No" });
-  const upd = (k,v) => setForm(f=>({...f,[k]:v}));
-
-  const steps = [
-    { title:"Personal Info", icon:"👤", desc:"Let's start with the basics" },
-    { title:"Employment", icon:"💼", desc:"Tell us about your income" },
-    { title:"Assets", icon:"🏦", desc:"Your savings and accounts" },
-    { title:"Property Goals", icon:"🏠", desc:"What are you looking to buy?" },
-    { title:"Credit History", icon:"📊", desc:"A few quick questions" },
-  ];
-
-  const content = [
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-      <div className="field"><label>First Name</label><input className="text-input" value={form.firstName} onChange={e=>upd("firstName",e.target.value)} /></div>
-      <div className="field"><label>Last Name</label><input className="text-input" value={form.lastName} onChange={e=>upd("lastName",e.target.value)} /></div>
-      <div className="field"><label>Phone</label><input className="text-input" value={form.phone} onChange={e=>upd("phone",e.target.value)} placeholder="(555) 000-0000" /></div>
-      <div className="field"><label>Date of Birth</label><input className="text-input" type="date" value={form.dob} onChange={e=>upd("dob",e.target.value)} /></div>
-    </div>,
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-      <div className="field" style={{ gridColumn:"1/-1" }}><label>Employer</label><input className="text-input" value={form.employer} onChange={e=>upd("employer",e.target.value)} placeholder="Acme Corp" /></div>
-      <div className="field"><label>Job Title</label><input className="text-input" value={form.jobTitle} onChange={e=>upd("jobTitle",e.target.value)} placeholder="Software Engineer" /></div>
-      <div className="field"><label>Years at Job</label><input className="text-input" value={form.jobYears} onChange={e=>upd("jobYears",e.target.value)} placeholder="3" /></div>
-      <div className="field"><label>Annual Income</label><input className="text-input" value={form.income} onChange={e=>upd("income",e.target.value)} placeholder="$85,000" /></div>
-      <div className="field"><label>Income Type</label><select className="text-input" value={form.incomeType} onChange={e=>upd("incomeType",e.target.value)}>{["Salary","Hourly","Self-Employed","Commission","Retirement","Other"].map(v=><option key={v}>{v}</option>)}</select></div>
-    </div>,
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-      <div className="field"><label>Checking Balance</label><input className="text-input" value={form.checkingBalance} onChange={e=>upd("checkingBalance",e.target.value)} placeholder="$12,000" /></div>
-      <div className="field"><label>Savings Balance</label><input className="text-input" value={form.savingsBalance} onChange={e=>upd("savingsBalance",e.target.value)} placeholder="$35,000" /></div>
-      <div className="field" style={{ gridColumn:"1/-1" }}><label>Other Assets (401k, stocks, etc.)</label><input className="text-input" value={form.otherAssets} onChange={e=>upd("otherAssets",e.target.value)} placeholder="$50,000" /></div>
-      <div style={{ gridColumn:"1/-1", padding:"0.75rem", background:"rgba(194,113,79,0.06)", borderRadius:"8px", fontSize:"0.85rem", color:"var(--muted)" }}>💡 Lenders want to see enough for your down payment + 2–3 months of reserves.</div>
-    </div>,
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-      <div className="field"><label>Target Purchase Price</label><input className="text-input" value={form.purchasePrice} onChange={e=>upd("purchasePrice",e.target.value)} placeholder="$385,000" /></div>
-      <div className="field"><label>Down Payment</label><select className="text-input" value={form.downPct} onChange={e=>upd("downPct",e.target.value)}>{["3","5","10","15","20","25"].map(v=><option key={v}>{v}%</option>)}</select></div>
-      <div className="field"><label>Property Type</label><select className="text-input" value={form.propType} onChange={e=>upd("propType",e.target.value)}>{["Single Family","Condo","Townhouse","Multi-Family","New Construction"].map(v=><option key={v}>{v}</option>)}</select></div>
-      <div className="field"><label>Preferred Loan Type</label><select className="text-input" value={form.loanType} onChange={e=>upd("loanType",e.target.value)}>{["Conventional 30-Year Fixed","Conventional 15-Year Fixed","FHA 30-Year","VA 30-Year","Not Sure"].map(v=><option key={v}>{v}</option>)}</select></div>
-    </div>,
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-      <div className="field"><label>Estimated Credit Score</label><input className="text-input" value={form.estimatedScore} onChange={e=>upd("estimatedScore",e.target.value)} placeholder="720" /></div>
-      <div className="field"><label>Monthly Debt Payments</label><input className="text-input" value={form.monthlyDebt} onChange={e=>upd("monthlyDebt",e.target.value)} placeholder="$450" /></div>
-      <div className="field"><label>Bankruptcies (last 7 years)?</label><select className="text-input" value={form.hasBankruptcy} onChange={e=>upd("hasBankruptcy",e.target.value)}><option>No</option><option>Yes — Chapter 7</option><option>Yes — Chapter 13</option></select></div>
-      <div className="field"><label>Foreclosures (last 7 years)?</label><select className="text-input" value={form.hasForeclosure} onChange={e=>upd("hasForeclosure",e.target.value)}><option>No</option><option>Yes</option></select></div>
-      <div style={{ gridColumn:"1/-1", padding:"0.75rem", background:"rgba(61,125,90,0.07)", borderRadius:"8px", fontSize:"0.85rem", color:"var(--muted)" }}>🔒 Encrypted and used only for pre-approval. A soft credit pull will be initiated with your consent.</div>
-    </div>,
-  ];
-
-  return (
-    <div style={{ minHeight:"100vh", background:"var(--bg)", display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
-      <style>{PORTAL_CSS}</style>
-      <div style={{ width:"100%", maxWidth:"580px" }}>
-        <div style={{ textAlign:"center", marginBottom:"2rem" }}>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.8rem", fontWeight:800, background:"linear-gradient(135deg,#c2714f,#a85c3a)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:"0.25rem" }}>HomeStart</div>
-          <div style={{ color:"var(--muted)", fontSize:"0.9rem" }}>Welcome, {form.firstName}! Let's get your pre-approval started.</div>
-        </div>
-        <div style={{ display:"flex", gap:"0.4rem", marginBottom:"0.5rem" }}>
-          {steps.map((_,i) => <div key={i} style={{ flex:1, height:"4px", borderRadius:"2px", background:i<=step?"var(--accent)":"var(--border)", transition:"background 0.3s" }} />)}
-        </div>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"2rem", fontSize:"0.8rem", color:"var(--muted)" }}>
-          <span>Step {step+1} of {steps.length}</span>
-          <span>{Math.round((step/steps.length)*100)}% complete</span>
-        </div>
-        <div className="card">
-          <div style={{ display:"flex", alignItems:"center", gap:"1rem", marginBottom:"1.5rem", paddingBottom:"1rem", borderBottom:"1px solid var(--border)" }}>
-            <div style={{ fontSize:"1.8rem" }}>{steps[step].icon}</div>
-            <div>
-              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700 }}>{steps[step].title}</div>
-              <div style={{ color:"var(--muted)", fontSize:"0.85rem" }}>{steps[step].desc}</div>
-            </div>
-          </div>
-          {content[step]}
-          <div style={{ display:"flex", gap:"1rem", marginTop:"2rem", justifyContent:"flex-end" }}>
-            {step>0 && <button className="btn-secondary" onClick={()=>setStep(s=>s-1)}>← Back</button>}
-            {step<steps.length-1
-              ? <button className="btn-primary" onClick={()=>setStep(s=>s+1)}>Continue →</button>
-              : <button className="btn-primary" onClick={async () => {
-                // Save onboarding data to Supabase profiles
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                  await supabase.from("profiles").update({
-                    onboarded: true,
-                    phone: form.phone || null,
-                    name: `${form.firstName} ${form.lastName}`.trim() || null,
-                  }).eq("id", session.user.id);
-                }
-                onComplete(form);
-              }}>Submit & Get Pre-Approved ✦</button>
-            }
-          </div>
-        </div>
-        <div style={{ display:"flex", justifyContent:"center", gap:"0.75rem", marginTop:"1.5rem", flexWrap:"wrap" }}>
-          {steps.map((s,i) => (
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:"0.3rem", cursor:i<step?"pointer":"default" }} onClick={()=>i<step&&setStep(i)}>
-              <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:i===step?"var(--accent)":i<step?"var(--green)":"var(--border)" }} />
-              <span style={{ fontSize:"0.72rem", color:i===step?"var(--text)":"var(--muted)" }}>{s.title}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =============================================
-// HOMEOWNER DASHBOARD SECTIONS
-// =============================================
-
-// ---- HOMEOWNER DASHBOARD (overview) ----
 function OwnerDashboard({ liveRates, setOwnerTab }) {
   const [home] = useState({
     address: "142 Maple Grove Dr, Austin, TX 78701",
@@ -3670,10 +3714,9 @@ function LenderPortal({ user, onLogout }) {
 
   const loadPreApprovalQueue = async () => {
     const { data, error } = await supabase
-      .from("pre_approval_applications")
-      .select("*")
-      .eq("assigned_lender_id", "bdf8864e-5765-4926-8fbe-6dbbff862015")
-      .order("submitted_at", { ascending: false });
+      .from("profiles")
+      .select("*, realtor_clients(realtor_id)")
+      .eq("pre_approval_status", "under_review");
     if (error) console.error("Pre-approval queue error:", error);
     if (data) setPreApprovalQueue(data);
   };
@@ -4190,7 +4233,7 @@ function LenderPortal({ user, onLogout }) {
                 <div className="l-card" style={{ padding:0, overflow:"hidden" }}>
                   <table className="l-table">
                     <thead>
-                      <tr><th>Borrower</th><th>Email</th><th>Income</th><th>Purchase Price</th><th>Loan Type</th><th>Credit Score</th><th>Submitted</th><th>Status</th></tr>
+                      <tr><th>Borrower</th><th>Email</th><th>Income</th><th>Purchase Price</th><th>Loan Type</th><th>Submitted</th><th></th></tr>
                     </thead>
                     <tbody>
                       {preApprovalQueue.map((p,i) => {
@@ -4622,36 +4665,21 @@ export default function App() {
   }, []);
 
   const loadProfile = async (userId) => {
-    // Safety timeout — never leave user stuck on loading screen
-    const timeout = setTimeout(() => {
-      console.warn("loadProfile timeout — forcing auth clear");
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (error) {
+      console.error("loadProfile error:", error);
+      // If profile doesn't exist yet, still clear loading so user isn't stuck
       setAuthLoading(false);
-    }, 5000);
-
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-      clearTimeout(timeout);
-      if (error) {
-        console.error("loadProfile error:", error.message, error.code);
-        setAuthLoading(false);
-        return;
-      }
-      if (!data) { setAuthLoading(false); return; }
-      setProfile(data);
-      if (data.role === "buyer") {
-        if (data.onboarded) setClientOnboarded(true);
-        else setClientOnboarded(false);
-      }
-    } catch(e) {
-      clearTimeout(timeout);
-      console.error("loadProfile exception:", e);
-    } finally {
-      setAuthLoading(false);
+      return;
     }
+    if (!data) { setAuthLoading(false); return; }
+    setProfile(data);
+    // All buyers go to main platform — PreApprovalSection shows form or Under Review based on profile
+    setAuthLoading(false);
   };
 
   const handleLogin = (sess) => {
@@ -4725,8 +4753,7 @@ export default function App() {
   // Realtor → show realtor portal
   if (role === "realtor") return <RealtorPortal user={user} onLogout={handleLogout} />;
 
-  // Client not yet onboarded → show wizard
-  if (role === "buyer" && !clientOnboarded) return <ClientOnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
+  // New buyers go straight to the main platform — PreApprovalSection handles first-time submission
 
   // Client onboarded → show main platform
   const NAV_ITEMS = BUYER_TABS;
