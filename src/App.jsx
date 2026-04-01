@@ -422,7 +422,7 @@ function ShopLoansSection({ liveRates }) {
 
 function PreApprovalSection({ user, profile }) {
   // If profile already has a pre_approval_status, start in submitted state
-  const alreadySubmitted = !!profile?.pre_approval_status;
+  const alreadySubmitted = !!profile?.pre_approval_status || profile?.pre_approval_status === "under_review";
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     firstName: (user?.name || "").split(" ")[0] || "",
@@ -505,36 +505,62 @@ function PreApprovalSection({ user, profile }) {
   ];
 
   const handleSubmit = async () => {
-  setSubmitting(true);
-  try {
-    const userId = user?.id;
-    if (!userId) throw new Error("Not logged in");
+    setSubmitting(true);
+    try {
+      const userId = user?.id;
+      if (!userId) throw new Error("Not logged in");
 
-    // 1. Update Profile with form data and status
-    const { error: profileErr } = await supabase.from("profiles").update({
-      pre_approval_status: "under_review",
-      pre_approval_submitted_at: new Date().toISOString(),
-      pre_approval_data: JSON.stringify(form),
-      first_name: form.firstName,
-      last_name: form.lastName,
-      assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015"
-    }).eq("id", userId);
+      const price = parseFloat((form.propPrice || "0").replace(/[^0-9.]/g, "")) || null;
 
-    if (profileErr) throw profileErr;
+      // 1. Upsert into pre_approval_applications (one row per user)
+      const { error: appErr } = await supabase
+        .from("pre_approval_applications")
+        .upsert({
+          user_id: userId,
+          assigned_lender_id: "bdf8864e-5765-4926-8fbe-6dbbff862015",
+          status: "under_review",
+          submitted_at: new Date().toISOString(),
+          first_name: form.firstName,
+          last_name: form.lastName,
+          email: form.email,
+          phone: form.phone || null,
+          employer: form.employer || null,
+          job_years: form.jobYears || null,
+          annual_income: parseFloat((form.income || "0").replace(/[^0-9.]/g, "")) || null,
+          assets: parseFloat((form.assets || "0").replace(/[^0-9.]/g, "")) || null,
+          credit_score: parseFloat(form.creditScore) || null,
+          has_co_applicant: form.hasCoApplicant || false,
+          co_first_name: form.hasCoApplicant ? form.coFirstName : null,
+          co_last_name: form.hasCoApplicant ? form.coLastName : null,
+          co_employer: form.hasCoApplicant ? form.coEmployer : null,
+          co_income: form.hasCoApplicant ? parseFloat((form.coIncome || "0").replace(/[^0-9.]/g, "")) || null : null,
+          purchase_price: price,
+          property_type: form.propType || null,
+          down_payment_pct: parseFloat(form.downPct) || null,
+          loan_type: form.loanType || null,
+        }, { onConflict: "user_id" });
 
-    // 2. Update Realtor's View
-    await supabase.from("realtor_clients").update({
-      client_status: "Pre-Approval Review",
-    }).eq("client_id", userId);
+      if (appErr) throw appErr;
 
-    setSubmitted(true);
-  } catch(e) {
-    console.error("Pre-approval save error:", e);
-    alert("Submission failed: " + (e.message || "Unknown error. Check console."));
-  } finally {
-    setSubmitting(false);
-  }
-};
+      // 2. Mark profile as having submitted pre-approval
+      await supabase.from("profiles").update({
+        pre_approval_status: "under_review",
+        pre_approval_submitted_at: new Date().toISOString(),
+      }).eq("id", userId);
+
+      // 3. Update realtor client status
+      await supabase.from("realtor_clients").update({
+        client_status: "Pre-Approval Review",
+      }).eq("client_id", userId);
+
+      setSubmitted(true);
+    } catch(e) {
+      console.error("Pre-approval save error:", e);
+      alert("Submission failed: " + (e.message || "Unknown error. Check console."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (submitted) {
     const price = parseFloat((form.propPrice || "385000").replace(/[^0-9.]/g, "")) || 385000;
@@ -3644,9 +3670,10 @@ function LenderPortal({ user, onLogout }) {
 
   const loadPreApprovalQueue = async () => {
     const { data, error } = await supabase
-      .from("profiles")
-      .select("*, realtor_clients(realtor_id)")
-      .eq("pre_approval_status", "under_review");
+      .from("pre_approval_applications")
+      .select("*")
+      .eq("assigned_lender_id", "bdf8864e-5765-4926-8fbe-6dbbff862015")
+      .order("submitted_at", { ascending: false });
     if (error) console.error("Pre-approval queue error:", error);
     if (data) setPreApprovalQueue(data);
   };
@@ -4163,7 +4190,7 @@ function LenderPortal({ user, onLogout }) {
                 <div className="l-card" style={{ padding:0, overflow:"hidden" }}>
                   <table className="l-table">
                     <thead>
-                      <tr><th>Borrower</th><th>Email</th><th>Income</th><th>Purchase Price</th><th>Loan Type</th><th>Submitted</th><th></th></tr>
+                      <tr><th>Borrower</th><th>Email</th><th>Income</th><th>Purchase Price</th><th>Loan Type</th><th>Credit Score</th><th>Submitted</th><th>Status</th></tr>
                     </thead>
                     <tbody>
                       {preApprovalQueue.map((p,i) => {
@@ -4595,24 +4622,36 @@ export default function App() {
   }, []);
 
   const loadProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (error) {
-      console.error("loadProfile error:", error);
-      // If profile doesn't exist yet, still clear loading so user isn't stuck
+    // Safety timeout — never leave user stuck on loading screen
+    const timeout = setTimeout(() => {
+      console.warn("loadProfile timeout — forcing auth clear");
       setAuthLoading(false);
-      return;
+    }, 5000);
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      clearTimeout(timeout);
+      if (error) {
+        console.error("loadProfile error:", error.message, error.code);
+        setAuthLoading(false);
+        return;
+      }
+      if (!data) { setAuthLoading(false); return; }
+      setProfile(data);
+      if (data.role === "buyer") {
+        if (data.onboarded) setClientOnboarded(true);
+        else setClientOnboarded(false);
+      }
+    } catch(e) {
+      clearTimeout(timeout);
+      console.error("loadProfile exception:", e);
+    } finally {
+      setAuthLoading(false);
     }
-    if (!data) { setAuthLoading(false); return; }
-    setProfile(data);
-    if (data.role === "buyer") {
-      if (data.onboarded) setClientOnboarded(true);
-      else setClientOnboarded(false);
-    }
-    setAuthLoading(false);
   };
 
   const handleLogin = (sess) => {
