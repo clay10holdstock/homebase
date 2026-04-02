@@ -2585,20 +2585,32 @@ export default function App() {
       .single();
     if (error) {
       console.error("loadProfile error:", error);
-      // If profile doesn't exist yet, still clear loading so user isn't stuck
       setAuthLoading(false);
       return;
     }
-    if (!data) { setAuthLoading(false); return; }
+    if (!data) {
+      console.warn("No profile found for user", userId);
+      setProfile({
+        id: userId,
+        role: session?.user?.app_metadata?.role || "buyer",
+        email: session?.user?.email || "",
+        name: session?.user?.email?.split("@")[0] || "",
+      });
+      setAuthLoading(false);
+      return;
+    }
     setProfile(data);
     // All buyers go to main platform — PreApprovalSection shows form or Under Review based on profile
     setAuthLoading(false);
   };
 
   const handleLogin = (sess) => {
-    // Used by demo login fallback only
+    // Used by demo login fallback only and by AuthScreen after sign in
+    if (!sess) return;
     setSession(sess);
-    if (sess.type === "client" && sess.user.onboarded) setClientOnboarded(true);
+    const userId = sess.session?.user?.id || sess.user?.id;
+    if (userId) loadProfile(userId);
+    if (sess.type === "client" && sess.user?.onboarded) setClientOnboarded(true);
   };
   const handleLogout = async () => {
     await supabase.auth.signOut();

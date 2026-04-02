@@ -15,8 +15,14 @@ export default function AuthScreen({ onLogin }) {
   const handleLogin = async () => {
     setError("");
     if (!email || !password) { setError("Please enter your email and password."); return; }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    if (data?.session && onLogin) {
+      onLogin(data.session);
+    }
   };
 
   const handleSignUp = async (role, opts = {}) => {
