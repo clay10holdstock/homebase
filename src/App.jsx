@@ -2590,9 +2590,10 @@ export default function App() {
     }
     if (!data) {
       console.warn("No profile found for user", userId);
+      const fallbackRole = session?.user?.app_metadata?.role || session?.user?.user_metadata?.role || "buyer";
       setProfile({
         id: userId,
-        role: session?.user?.app_metadata?.role || "buyer",
+        role: fallbackRole,
         email: session?.user?.email || "",
         name: session?.user?.email?.split("@")[0] || "",
       });
@@ -2668,8 +2669,17 @@ export default function App() {
     </div>
   );
 
-  // Determine role — from Supabase profile
-  const role = profile.role;
+  // Determine role — from Supabase profile, user metadata, or fallback
+  const normalizeRole = (value) => {
+    const lower = (value || "").toString().toLowerCase();
+    if (lower.includes("lend") || lower.includes("loan") || lower.includes("officer") || lower.includes("admin")) return "lender";
+    if (lower.includes("real") || lower.includes("realtor") || lower.includes("agent")) return "realtor";
+    return "buyer";
+  };
+
+  const role = normalizeRole(
+    profile?.role || profile?.user_type || profile?.type || session?.user?.app_metadata?.role || session?.user?.user_metadata?.role
+  );
   const user = { ...profile };
 
   // Lender → show lender portal
