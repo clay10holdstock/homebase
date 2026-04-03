@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase.js";
-import { PORTAL_CSS } from "../constants/appConstants.js";
+import { PORTAL_CSS, MOCK_DB } from "../constants/appConstants.js";
+import { formatCurrency } from "../utils/loanUtils.js";
 import GradeMyRateSectionPublic from "./GradeMyRateSectionPublic.jsx";
 
 export function GradeMyRateLanding({ liveRates, onBack }) {

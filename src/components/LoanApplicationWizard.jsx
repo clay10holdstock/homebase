@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCurrency } from "../utils/loanUtils.js";
 
 export default function LoanApplicationWizard({ user, onComplete, onDismiss }) {
   const [step, setStep] = useState(0);

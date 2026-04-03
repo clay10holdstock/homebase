@@ -8,7 +8,7 @@ import GradeMyRateSection from "./components/GradeMyRateSection.jsx";
 import { GradeMyRateLandingWrapper } from "./components/GradeMyRateLanding.jsx";
 import LoanApplicationWizard from "./components/LoanApplicationWizard.jsx";
 import InviteAcceptPage from "./components/InviteAcceptPage.jsx";
-import { PORTAL_CSS, MOCK_DB, STATUS_STEPS, STATUS_COLORS } from "./constants/appConstants.js";
+import { PORTAL_CSS, LENDER_CSS, MOCK_DB, STATUS_STEPS, STATUS_COLORS } from "./constants/appConstants.js";
 
 const BUYER_TABS = ["Pre-Approval", "Grade My Rate"];
 const BUYER_TITLES = ["Pre-Approval", "Grade My Rate"];
