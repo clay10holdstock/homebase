@@ -87,7 +87,7 @@ export const STATUS_COLORS = {
 };
 
 
-const MOCK_DB = {
+export const MOCK_DB = {
   realtors: [
     { id: "r1", email: "sarah@austinrealty.com", password: "demo", name: "Sarah Connelly", brokerage: "Austin Premier Realty", phone: "(512) 555-0182", license: "TX-589234", avatar: "SC", clients: ["c1","c2","c3"] }
   ],
