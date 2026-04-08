@@ -58,7 +58,7 @@ Respond ONLY in valid JSON (no markdown, no backticks):
 Loan details: Lender: ${manual.lender||"Unknown"}, Rate: ${manual.rate}%, APR: ${manual.apr}%, Amount: $${manual.loanAmt}, Type: ${manual.loanType}, Points: ${manual.points}, Closing Costs: $${manual.closingCosts}` }];
       }
 
-      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages }) });
+      const res  = await fetch("/api/analyze-rate", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages }) });
       const data = await res.json();
       const text = data.content.map(i=>i.text||"").join("");
       const parsed = JSON.parse(text.trim());

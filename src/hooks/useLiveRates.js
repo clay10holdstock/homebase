@@ -16,13 +16,12 @@ function buildLoanProducts(r30, r15) {
 }
 
 async function fetchLiveRatesViaClaude() {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/analyze-rate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{
         role: "user",
         content: `Search for the current Freddie Mac Primary Mortgage Market Survey (PMMS) rates. Find the most recent weekly average rates for 30-year fixed and 15-year fixed mortgages.

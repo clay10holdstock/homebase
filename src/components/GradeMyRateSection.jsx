@@ -152,7 +152,7 @@ Respond ONLY in valid JSON (no markdown, no backticks) with this exact structure
         }];
       }
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/analyze-rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

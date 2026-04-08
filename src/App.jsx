@@ -1879,7 +1879,7 @@ function LenderPortal({ user, onLogout }) {
     if (data) setPreApprovalQueue(data);
   };
 
-  const statuses = ["All", ...Object.keys(APP_STATUS_COLORS)];
+  const statuses = ["All", ...Object.keys(STATUS_COLORS)];
 
   const filtered = applications.filter(a => {
     const matchStatus = statusFilter === "All" || a.status === statusFilter;
@@ -1908,7 +1908,7 @@ function LenderPortal({ user, onLogout }) {
   const closeDecision = () => { setShowDecisionModal(null); setDecisionNote(""); setDecisionRate(""); setDecisionDone(false); };
 
   const StatusChip = ({ status }) => {
-    const c = APP_STATUS_COLORS[status] || { bg:"#f0ebe3", text:"#8a7968", border:"#e2dbd0" };
+    const c = STATUS_COLORS[status] || { bg:"#f0ebe3", text:"#8a7968", border:"#e2dbd0" };
     return <span className="l-status-chip" style={{ background:c.bg, color:c.text, borderColor:c.border }}>{status}</span>;
   };
 
@@ -2290,7 +2290,7 @@ function LenderPortal({ user, onLogout }) {
 
                 <div className="l-card">
                   <div className="l-section-label">Pipeline by Status</div>
-                  {Object.entries(APP_STATUS_COLORS).map(([status, c]) => {
+                  {Object.entries(STATUS_COLORS).map(([status, c]) => {
                     const count = applications.filter(a => a.status === status).length;
                     if (!count) return null;
                     return (
