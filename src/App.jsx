@@ -1943,6 +1943,15 @@ function LenderPortal({ user, onLogout }) {
 
       setPreApprovalQueue(prev => prev.filter(p => p.id !== selectedPreApproval.id));
       setPreApprovalDone(true);
+      
+      // Close modal and reset form
+      setSelectedPreApproval(null);
+      setPreApprovalDecision(null);
+      setPreApprovalAmount("");
+      setPreApprovalConditions("");
+      
+      // Show success message
+      alert(`Application ${decision === "approve" ? "approved" : "denied"}successfully!`);
     } catch (err) {
       console.error("Pre-approval decision error:", err);
       alert("Error recording decision: " + (err.message || "Unknown error"));

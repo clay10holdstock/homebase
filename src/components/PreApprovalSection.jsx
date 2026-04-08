@@ -27,6 +27,10 @@ export default function PreApprovalSection({ user, profile }) {
 
           if (data) {
             setSubmittedData({
+              status: data.status || "under_review",
+              preApprovalAmount: data.pre_approval_amount || null,
+              conditionsNotes: data.conditions_notes || "",
+              updatedAt: data.updated_at || "",
               firstName: data.first_name || "",
               lastName: data.last_name || "",
               email: data.email || "",
@@ -78,6 +82,35 @@ export default function PreApprovalSection({ user, profile }) {
       })();
     }
   }, [alreadySubmitted, user?.id, submittedData]);
+
+  // Function to refresh pre-approval status
+  const refreshStatus = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from("pre_approval_applications")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Error refreshing pre-approval:", error);
+        return;
+      }
+
+      if (data) {
+        setSubmittedData(prev => ({
+          ...prev,
+          status: data.status || "under_review",
+          preApprovalAmount: data.pre_approval_amount || null,
+          conditionsNotes: data.conditions_notes || "",
+          updatedAt: data.updated_at || "",
+        }));
+      }
+    } catch (err) {
+      console.error("Error refreshing status:", err);
+    }
+  };
 
   const [form, setForm] = useState({
     // Step 1 — Personal
@@ -377,13 +410,59 @@ export default function PreApprovalSection({ user, profile }) {
 
     return (
       <div style={{ maxWidth:"680px", margin:"0 auto" }}>
-        <div style={{ background:"linear-gradient(135deg,rgba(47,111,168,0.1),rgba(47,111,168,0.04))", border:"1px solid rgba(47,111,168,0.2)", borderRadius:"16px", padding:"2.5rem", textAlign:"center", marginBottom:"1.5rem" }}>
-          <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>⏳</div>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--blue)", marginBottom:"0.5rem" }}>Application Under Review</div>
-          <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
-            Your pre-approval application has been submitted to your loan officer. You'll hear back within <strong>1–2 business days</strong>.
+        {data.status === "pre_approved" ? (
+          <div style={{ background:"linear-gradient(135deg,rgba(61,125,90,0.1),rgba(61,125,90,0.04))", border:"1px solid rgba(61,125,90,0.2)", borderRadius:"16px", padding:"2.5rem", textAlign:"center", marginBottom:"1.5rem" }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>🎉</div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--green)", marginBottom:"0.5rem" }}>Pre-Approved!</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
+              Congratulations! You've been pre-approved. Your loan officer will be in touch with next steps.
+            </div>
           </div>
-        </div>
+        ) : data.status === "denied" ? (
+          <div style={{ background:"linear-gradient(135deg,rgba(192,57,43,0.1),rgba(192,57,43,0.04))", border:"1px solid rgba(192,57,43,0.2)", borderRadius:"16px", padding:"2.5rem", textAlign:"center", marginBottom:"1.5rem" }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>❌</div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--red)", marginBottom:"0.5rem" }}>Application Not Approved</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
+              Unfortunately, we're unable to approve your application at this time. Your loan officer will contact you with details.
+            </div>
+          </div>
+        ) : (
+          <div style={{ background:"linear-gradient(135deg,rgba(47,111,168,0.1),rgba(47,111,168,0.04))", border:"1px solid rgba(47,111,168,0.2)", borderRadius:"16px", padding:"2.5rem", textAlign:"center", marginBottom:"1.5rem" }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>⏳</div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--blue)", marginBottom:"0.5rem" }}>Application Under Review</div>
+            <div style={{ color:"var(--muted)", fontSize:"0.9rem", lineHeight:1.7, maxWidth:"420px", margin:"0 auto" }}>
+              Your pre-approval application has been submitted to your loan officer. You'll hear back within <strong>1–2 business days</strong>.
+            </div>
+          </div>
+        )}
+
+        {data.status === "pre_approved" && data.preApprovalAmount && (
+          <div className="card" style={{ marginBottom:"1.5rem", background:"linear-gradient(135deg,rgba(61,125,90,0.04),rgba(61,125,90,0.02))" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1rem" }}>
+              <span style={{ fontSize:"1.25rem" }}>✓</span>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.1rem", fontWeight:700 }}>Pre-Approval Details</div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+              <div>
+                <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.08em", color:"var(--muted)", marginBottom:"0.35rem", fontWeight:600 }}>Pre-Approval Amount</div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.5rem", fontWeight:700, color:"var(--green)" }}>{formatCurrency(data.preApprovalAmount)}</div>
+              </div>
+              {data.conditionsNotes && (
+                <div style={{ gridColumn:"1/-1" }}>
+                  <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.08em", color:"var(--muted)", marginBottom:"0.35rem", fontWeight:600 }}>Conditions & Notes</div>
+                  <div style={{ fontSize:"0.9rem", color:"var(--text)", lineHeight:1.6 }}>{data.conditionsNotes}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {data.status === "denied" && data.conditionsNotes && (
+          <div className="card" style={{ marginBottom:"1.5rem", background:"linear-gradient(135deg,rgba(192,57,43,0.04),rgba(192,57,43,0.02))", borderLeft:"3px solid var(--red)" }}>
+            <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.08em", color:"var(--muted)", marginBottom:"0.5rem", fontWeight:600 }}>Reason for Decision</div>
+            <div style={{ fontSize:"0.9rem", color:"var(--text)", lineHeight:1.6 }}>{data.conditionsNotes}</div>
+          </div>
+        )}
 
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem", marginBottom:"1.25rem" }}>
           {[
@@ -400,7 +479,26 @@ export default function PreApprovalSection({ user, profile }) {
         </div>
 
         <div className="card" style={{ marginBottom:"1rem" }}>
-          <div className="section-label">Submitted Details</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1rem" }}>
+            <div className="section-label" style={{ margin:0 }}>Submitted Details</div>
+            <button 
+              onClick={refreshStatus} 
+              style={{ 
+                background:"transparent", 
+                border:"1px solid var(--border)", 
+                borderRadius:"6px", 
+                padding:"0.4rem 0.75rem", 
+                fontSize:"0.8rem", 
+                cursor:"pointer", 
+                color:"var(--muted)",
+                transition:"all 0.2s"
+              }}
+              onMouseEnter={e => { e.target.style.background = "var(--surface)"; e.target.style.color = "var(--text)"; }}
+              onMouseLeave={e => { e.target.style.background = "transparent"; e.target.style.color = "var(--muted)"; }}
+            >
+              🔄 Refresh
+            </button>
+          </div>
           {[
             ["Applicant", `${data.firstName || ""} ${data.lastName || ""}`.trim() || "—"],
             ["Loan Type", data.loanType || "—"],
@@ -414,8 +512,8 @@ export default function PreApprovalSection({ user, profile }) {
           ))}
         </div>
 
-        <div style={{ padding:"0.85rem 1rem", background:"rgba(61,125,90,0.07)", borderRadius:"10px", border:"1px solid rgba(61,125,90,0.2)", fontSize:"0.85rem", color:"var(--green)", textAlign:"center" }}>
-          ✓ Your realtor has been notified. You will receive an email when a decision is made.
+        <div style={{ padding:"0.85rem 1rem", background: data.status === "pre_approved" ? "rgba(61,125,90,0.07)" : data.status === "denied" ? "rgba(192,57,43,0.07)" : "rgba(61,125,90,0.07)", borderRadius:"10px", border: data.status === "pre_approved" ? "1px solid rgba(61,125,90,0.2)" : data.status === "denied" ? "1px solid rgba(192,57,43,0.2)" : "1px solid rgba(61,125,90,0.2)", fontSize:"0.85rem", color: data.status === "pre_approved" ? "var(--green)" : data.status === "denied" ? "var(--red)" : "var(--green)", textAlign:"center" }}>
+          {data.status === "pre_approved" ? "✓ Congratulations! You've been pre-approved. Your loan officer will be in touch shortly." : data.status === "denied" ? "Your application was not approved at this time. Your loan officer will follow up with you." : "✓ Your realtor has been notified. You will receive an email when a decision is made."}
         </div>
       </div>
     );
