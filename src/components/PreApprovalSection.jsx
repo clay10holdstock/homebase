@@ -9,6 +9,76 @@ export default function PreApprovalSection({ user, profile }) {
   const [submitted, setSubmitted] = useState(alreadySubmitted);
   const [submittedData, setSubmittedData] = useState(null);
 
+  // Fetch submitted pre-approval data from Supabase on mount
+  useEffect(() => {
+    if (alreadySubmitted && !submittedData && user?.id) {
+      (async () => {
+        try {
+          const { data, error } = await supabase
+            .from("pre_approval_applications")
+            .select("*")
+            .eq("user_id", user.id)
+            .single();
+
+          if (error) {
+            console.error("Error fetching pre-approval:", error);
+            return;
+          }
+
+          if (data) {
+            setSubmittedData({
+              firstName: data.first_name || "",
+              lastName: data.last_name || "",
+              email: data.email || "",
+              phone: data.phone || "",
+              dob: data.date_of_birth || "",
+              ssnLast4: data.ssn_last4 || "",
+              citizenship: data.citizenship || "US Citizen",
+              currentHousing: data.current_housing || "Renting",
+              monthlyHousingPayment: data.monthly_housing_payment ? String(data.monthly_housing_payment) : "",
+              employmentType: data.employment_type || "Full-Time Salaried",
+              employer: data.employer || "",
+              jobTitle: data.job_title || "",
+              jobYears: data.job_years || "",
+              annualIncome: data.annual_income ? String(data.annual_income) : "",
+              otherIncome: data.other_income ? String(data.other_income) : "",
+              otherIncomeSource: data.other_income_source || "",
+              hasCoApplicant: data.has_co_applicant || false,
+              coFirstName: data.co_first_name || "",
+              coLastName: data.co_last_name || "",
+              coEmploymentType: data.co_employment_type || "Full-Time Salaried",
+              coEmployer: data.co_employer || "",
+              coJobTitle: data.co_job_title || "",
+              coAnnualIncome: data.co_income ? String(data.co_income) : "",
+              debtCarLoan: data.debt_car_loan ? String(data.debt_car_loan) : "",
+              debtStudentLoan: data.debt_student_loan ? String(data.debt_student_loan) : "",
+              debtCreditCard: data.debt_credit_card ? String(data.debt_credit_card) : "",
+              debtPersonalLoan: data.debt_personal_loan ? String(data.debt_personal_loan) : "",
+              debtOther: data.debt_other ? String(data.debt_other) : "",
+              checkingBalance: data.checking_balance ? String(data.checking_balance) : "",
+              savingsBalance: data.savings_balance ? String(data.savings_balance) : "",
+              retirementBalance: data.retirement_balance ? String(data.retirement_balance) : "",
+              otherAssets: data.other_assets ? String(data.other_assets) : "",
+              giftFunds: data.gift_funds || false,
+              giftFundsAmount: data.gift_funds_amount ? String(data.gift_funds_amount) : "",
+              propPrice: data.purchase_price ? String(data.purchase_price) : "",
+              downPct: data.down_payment_pct ? String(data.down_payment_pct) : "20",
+              propType: data.property_type || "Single Family",
+              occupancy: data.occupancy || "Primary Residence",
+              loanType: data.loan_type || "Conventional 30-Year Fixed",
+              purchaseTimeline: data.purchase_timeline || "1-3 months",
+              creditScore: data.credit_score_range || "",
+              hasBankruptcy: data.has_bankruptcy || false,
+              hasForeclosure: data.has_foreclosure || false,
+            });
+          }
+        } catch (err) {
+          console.error("Error loading pre-approval data:", err);
+        }
+      })();
+    }
+  }, [alreadySubmitted, user?.id, submittedData]);
+
   const [form, setForm] = useState({
     // Step 1 — Personal
     firstName: (user?.name || "").split(" ")[0] || "",
