@@ -1872,9 +1872,10 @@ function LenderPortal({ user, onLogout }) {
 
   const loadPreApprovalQueue = async () => {
     const { data, error } = await supabase
-      .from("profiles")
-      .select("*, realtor_clients(realtor_id)")
-      .eq("pre_approval_status", "under_review");
+      .from("pre_approval_applications")
+      .select("*")
+      .eq("status", "under_review")
+      .order("submitted_at", { ascending: false });
     if (error) console.error("Pre-approval queue error:", error);
     if (data) setPreApprovalQueue(data);
   };
@@ -2395,15 +2396,14 @@ function LenderPortal({ user, onLogout }) {
                     </thead>
                     <tbody>
                       {preApprovalQueue.map((p,i) => {
-                        const data = p.pre_approval_data ? JSON.parse(p.pre_approval_data) : {};
                         return (
                           <tr key={i}>
-                            <td style={{ fontWeight:600 }}>{p.full_name || (p.first_name ? `${p.first_name} ${p.last_name || ""}`.trim() : p.email)}</td>
+                            <td style={{ fontWeight:600 }}>{`${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email}</td>
                             <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.email}</td>
-                            <td><span className="mono">{data.income || "—"}</span></td>
-                            <td><span className="mono">{data.propPrice || "—"}</span></td>
-                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{data.loanType || "—"}</td>
-                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.pre_approval_submitted_at ? new Date(p.pre_approval_submitted_at).toLocaleDateString() : "—"}</td>
+                            <td><span className="mono">{p.annual_income ? formatCurrency(p.annual_income) : "—"}</span></td>
+                            <td><span className="mono">{p.purchase_price ? formatCurrency(p.purchase_price) : "—"}</span></td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.loan_type || "—"}</td>
+                            <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.submitted_at ? new Date(p.submitted_at).toLocaleDateString() : "—"}</td>
                             <td><span className="l-status-chip" style={{ background:"rgba(47,111,168,0.1)", color:"var(--blue)", borderColor:"rgba(47,111,168,0.25)" }}>Under Review</span></td>
                           </tr>
                         );
