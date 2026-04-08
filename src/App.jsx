@@ -2199,173 +2199,6 @@ function LenderPortal({ user, onLogout }) {
             </div>
           </div>
         </main>
-
-        {/* Decision Modal */}
-        {showDecisionModal && (
-          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(4px)" }}>
-            <div style={{ background:"white", borderRadius:"16px", padding:"2rem", width:"460px", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-              {decisionDone ? (
-                <div style={{ textAlign:"center", padding:"1rem 0" }}>
-                  <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>{showDecisionModal==="approve"?"✅":showDecisionModal==="deny"?"❌":"⏸️"}</div>
-                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, marginBottom:"0.5rem" }}>
-                    {showDecisionModal==="approve"?"Application Approved":showDecisionModal==="deny"?"Application Denied":"Application Suspended"}
-                  </div>
-                  <div style={{ color:"var(--muted)", fontSize:"0.88rem", marginBottom:"1.5rem" }}>Decision recorded and borrower has been notified.</div>
-                  <button className="l-btn-primary" style={{ width:"100%" }} onClick={closeDecision}>Done</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, marginBottom:"0.25rem" }}>
-                    {showDecisionModal==="approve"?"Approve Application":showDecisionModal==="deny"?"Deny Application":"Suspend Application"}
-                  </div>
-                  <div style={{ color:"var(--muted)", fontSize:"0.85rem", marginBottom:"1.5rem" }}>
-                    {showDecisionModal==="approve"?"Set the approved rate and add any conditions.":showDecisionModal==="deny"?"Provide a reason for denial (required for ECOA compliance).":"Specify what the borrower needs to provide to continue."}
-                  </div>
-                  {showDecisionModal==="approve" && (
-                    <div style={{ marginBottom:"1rem" }}>
-                      <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>Approved Rate (%)</label>
-                      <input className="l-input" style={{ width:"100%" }} placeholder="e.g. 6.875" value={decisionRate} onChange={e=>setDecisionRate(e.target.value)} />
-                    </div>
-                  )}
-                  <div style={{ marginBottom:"1.5rem" }}>
-                    <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>
-                      {showDecisionModal==="approve"?"Conditions / Notes":showDecisionModal==="deny"?"Denial Reason":"Required Items"}
-                    </label>
-                    <textarea className="l-input" style={{ width:"100%", minHeight:"90px", resize:"vertical" }} value={decisionNote} onChange={e=>setDecisionNote(e.target.value)} placeholder="Add details..." />
-                  </div>
-                  <div style={{ display:"flex", gap:"0.75rem" }}>
-                    <button className="l-btn-secondary" style={{ flex:1 }} onClick={closeDecision}>Cancel</button>
-                    <button
-                      className={showDecisionModal==="approve"?"l-btn-approve":showDecisionModal==="deny"?"l-btn-deny":"l-btn-suspend"}
-                      style={{ flex:2 }}
-                      onClick={() => doDecision(showDecisionModal==="approve"?"Approved":showDecisionModal==="deny"?"Denied":"Suspended")}
-                    >
-                      Confirm {showDecisionModal==="approve"?"Approval":showDecisionModal==="deny"?"Denial":"Suspension"}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Pre-Approval Detail Modal */}
-        {selectedPreApproval && (
-          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(4px)", overflowY: "auto" }}>
-            <div style={{ background:"white", borderRadius:"16px", padding:"2rem", width:"640px", maxHeight:"90vh", overflowY: "auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", margin: "2rem auto" }}>
-              {preApprovalDone ? (
-                <div style={{ textAlign:"center", padding:"2rem 0" }}>
-                  <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>✅</div>
-                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.5rem" }}>Decision Recorded</div>
-                  <div style={{ color:"var(--muted)", fontSize:"0.9rem", marginBottom:"1.5rem" }}>The borrower will be notified of the {preApprovalDecision} decision.</div>
-                  <button className="l-btn-primary" style={{ width:"100%" }} onClick={closePreApprovalModal}>Done</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.5rem" }}>
-                    <div>
-                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.4rem", fontWeight:700 }}>{`${selectedPreApproval.first_name || ""} ${selectedPreApproval.last_name || ""}`.trim() || "Borrower"}</div>
-                      <div style={{ color:"var(--muted)", fontSize:"0.85rem" }}>{selectedPreApproval.email}</div>
-                    </div>
-                    <button style={{ background:"none", border:"none", fontSize:"1.5rem", cursor:"pointer" }} onClick={closePreApprovalModal}>✕</button>
-                  </div>
-
-                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
-                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Financial Profile</div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-                      {[
-                        ["Annual Income", selectedPreApproval.annual_income ? formatCurrency(selectedPreApproval.annual_income) : "—"],
-                        ["Purchase Price", selectedPreApproval.purchase_price ? formatCurrency(selectedPreApproval.purchase_price) : "—"],
-                        ["Down Payment %", `${selectedPreApproval.down_payment_pct || "—"}%`],
-                        ["Loan Type", selectedPreApproval.loan_type || "—"],
-                        ["Credit Score", selectedPreApproval.credit_score_range || "—"],
-                        ["Employment", selectedPreApproval.employment_type || "—"],
-                      ].map(([k, v], i) => (
-                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
-                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
-                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
-                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Contact & Property</div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-                      {[
-                        ["Phone", selectedPreApproval.phone || "—"],
-                        ["Date of Birth", selectedPreApproval.date_of_birth ? new Date(selectedPreApproval.date_of_birth).toLocaleDateString() : "—"],
-                        ["Property Type", selectedPreApproval.property_type || "—"],
-                        ["Occupancy", selectedPreApproval.occupancy || "—"],
-                        ["Current Housing", selectedPreApproval.current_housing || "—"],
-                        ["Purchase Timeline", selectedPreApproval.purchase_timeline || "—"],
-                      ].map(([k, v], i) => (
-                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
-                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
-                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
-                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Debts & Assets</div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-                      {[
-                        ["Auto Loan", selectedPreApproval.debt_car_loan ? formatCurrency(selectedPreApproval.debt_car_loan) : "—"],
-                        ["Student Loans", selectedPreApproval.debt_student_loan ? formatCurrency(selectedPreApproval.debt_student_loan) : "—"],
-                        ["Credit Cards", selectedPreApproval.debt_credit_card ? formatCurrency(selectedPreApproval.debt_credit_card) : "—"],
-                        ["Checking Balance", selectedPreApproval.checking_balance ? formatCurrency(selectedPreApproval.checking_balance) : "—"],
-                        ["Savings Balance", selectedPreApproval.savings_balance ? formatCurrency(selectedPreApproval.savings_balance) : "—"],
-                        ["Retirement", selectedPreApproval.retirement_balance ? formatCurrency(selectedPreApproval.retirement_balance) : "—"],
-                      ].map(([k, v], i) => (
-                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
-                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
-                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {!preApprovalDecision ? (
-                    <div style={{ display:"flex", gap:"0.75rem" }}>
-                      <button className="l-btn-deny" style={{ flex:1 }} onClick={() => setPreApprovalDecision("deny")}>✕ Reject</button>
-                      <button className="l-btn-approve" style={{ flex:1 }} onClick={() => setPreApprovalDecision("approve")}>✓ Approve Pre-Approval</button>
-                    </div>
-                  ) : (
-                    <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem" }}>
-                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.1rem", fontWeight:700, marginBottom:"1rem" }}>
-                        {preApprovalDecision === "approve" ? "Set Pre-Approval Amount" : "Provide Rejection Reason"}
-                      </div>
-                      {preApprovalDecision === "approve" && (
-                        <div style={{ marginBottom:"1rem" }}>
-                          <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>Pre-Approval Amount ($) *</label>
-                          <input className="l-input" style={{ width:"100%", fontSize:"1rem" }} placeholder="e.g. 350000" value={preApprovalAmount} onChange={e=>setPreApprovalAmount(e.target.value)} type="number" />
-                        </div>
-                      )}
-                      <div style={{ marginBottom:"1.5rem" }}>
-                        <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>
-                          {preApprovalDecision === "approve" ? "Conditions / Notes" : "Rejection Reason *"}
-                        </label>
-                        <textarea className="l-input" style={{ width:"100%", minHeight:"100px", resize:"vertical" }} value={preApprovalConditions} onChange={e=>setPreApprovalConditions(e.target.value)} placeholder="Add details..." />
-                      </div>
-                      <div style={{ display:"flex", gap:"0.75rem" }}>
-                        <button className="l-btn-secondary" style={{ flex:1 }} onClick={() => { setPreApprovalDecision(null); setPreApprovalAmount(""); setPreApprovalConditions(""); }}>Back</button>
-                        <button
-                          className={preApprovalDecision === "approve" ? "l-btn-approve" : "l-btn-deny"}
-                          style={{ flex:2 }}
-                          onClick={() => doPreApprovalDecision(preApprovalDecision)}
-                        >
-                          Confirm {preApprovalDecision === "approve" ? "Approval" : "Rejection"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -2690,6 +2523,173 @@ function LenderPortal({ user, onLogout }) {
           )}
 
         </div>
+
+        {/* Decision Modal */}
+        {showDecisionModal && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(4px)" }}>
+            <div style={{ background:"white", borderRadius:"16px", padding:"2rem", width:"460px", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+              {decisionDone ? (
+                <div style={{ textAlign:"center", padding:"1rem 0" }}>
+                  <div style={{ fontSize:"2.5rem", marginBottom:"0.75rem" }}>{showDecisionModal==="approve"?"✅":showDecisionModal==="deny"?"❌":"⏸️"}</div>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, marginBottom:"0.5rem" }}>
+                    {showDecisionModal==="approve"?"Application Approved":showDecisionModal==="deny"?"Application Denied":"Application Suspended"}
+                  </div>
+                  <div style={{ color:"var(--muted)", fontSize:"0.88rem", marginBottom:"1.5rem" }}>Decision recorded and borrower has been notified.</div>
+                  <button className="l-btn-primary" style={{ width:"100%" }} onClick={closeDecision}>Done</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, marginBottom:"0.25rem" }}>
+                    {showDecisionModal==="approve"?"Approve Application":showDecisionModal==="deny"?"Deny Application":"Suspend Application"}
+                  </div>
+                  <div style={{ color:"var(--muted)", fontSize:"0.85rem", marginBottom:"1.5rem" }}>
+                    {showDecisionModal==="approve"?"Set the approved rate and add any conditions.":showDecisionModal==="deny"?"Provide a reason for denial (required for ECOA compliance).":"Specify what the borrower needs to provide to continue."}
+                  </div>
+                  {showDecisionModal==="approve" && (
+                    <div style={{ marginBottom:"1rem" }}>
+                      <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>Approved Rate (%)</label>
+                      <input className="l-input" style={{ width:"100%" }} placeholder="e.g. 6.875" value={decisionRate} onChange={e=>setDecisionRate(e.target.value)} />
+                    </div>
+                  )}
+                  <div style={{ marginBottom:"1.5rem" }}>
+                    <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>
+                      {showDecisionModal==="approve"?"Conditions / Notes":showDecisionModal==="deny"?"Denial Reason":"Required Items"}
+                    </label>
+                    <textarea className="l-input" style={{ width:"100%", minHeight:"90px", resize:"vertical" }} value={decisionNote} onChange={e=>setDecisionNote(e.target.value)} placeholder="Add details..." />
+                  </div>
+                  <div style={{ display:"flex", gap:"0.75rem" }}>
+                    <button className="l-btn-secondary" style={{ flex:1 }} onClick={closeDecision}>Cancel</button>
+                    <button
+                      className={showDecisionModal==="approve"?"l-btn-approve":showDecisionModal==="deny"?"l-btn-deny":"l-btn-suspend"}
+                      style={{ flex:2 }}
+                      onClick={() => doDecision(showDecisionModal==="approve"?"Approved":showDecisionModal==="deny"?"Denied":"Suspended")}
+                    >
+                      Confirm {showDecisionModal==="approve"?"Approval":showDecisionModal==="deny"?"Denial":"Suspension"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Pre-Approval Detail Modal */}
+        {selectedPreApproval && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(4px)", overflowY: "auto" }}>
+            <div style={{ background:"white", borderRadius:"16px", padding:"2rem", width:"640px", maxHeight:"90vh", overflowY: "auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", margin: "2rem auto" }}>
+              {preApprovalDone ? (
+                <div style={{ textAlign:"center", padding:"2rem 0" }}>
+                  <div style={{ fontSize:"3rem", marginBottom:"1rem" }}>✅</div>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.3rem", fontWeight:700, marginBottom:"0.5rem" }}>Decision Recorded</div>
+                  <div style={{ color:"var(--muted)", fontSize:"0.9rem", marginBottom:"1.5rem" }}>The borrower will be notified of the {preApprovalDecision} decision.</div>
+                  <button className="l-btn-primary" style={{ width:"100%" }} onClick={closePreApprovalModal}>Done</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.5rem" }}>
+                    <div>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.4rem", fontWeight:700 }}>{`${selectedPreApproval.first_name || ""} ${selectedPreApproval.last_name || ""}`.trim() || "Borrower"}</div>
+                      <div style={{ color:"var(--muted)", fontSize:"0.85rem" }}>{selectedPreApproval.email}</div>
+                    </div>
+                    <button style={{ background:"none", border:"none", fontSize:"1.5rem", cursor:"pointer" }} onClick={closePreApprovalModal}>✕</button>
+                  </div>
+
+                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
+                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Financial Profile</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+                      {[
+                        ["Annual Income", selectedPreApproval.annual_income ? formatCurrency(selectedPreApproval.annual_income) : "—"],
+                        ["Purchase Price", selectedPreApproval.purchase_price ? formatCurrency(selectedPreApproval.purchase_price) : "—"],
+                        ["Down Payment %", `${selectedPreApproval.down_payment_pct || "—"}%`],
+                        ["Loan Type", selectedPreApproval.loan_type || "—"],
+                        ["Credit Score", selectedPreApproval.credit_score_range || "—"],
+                        ["Employment", selectedPreApproval.employment_type || "—"],
+                      ].map(([k, v], i) => (
+                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
+                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
+                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
+                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Contact & Property</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+                      {[
+                        ["Phone", selectedPreApproval.phone || "—"],
+                        ["Date of Birth", selectedPreApproval.date_of_birth ? new Date(selectedPreApproval.date_of_birth).toLocaleDateString() : "—"],
+                        ["Property Type", selectedPreApproval.property_type || "—"],
+                        ["Occupancy", selectedPreApproval.occupancy || "—"],
+                        ["Current Housing", selectedPreApproval.current_housing || "—"],
+                        ["Purchase Timeline", selectedPreApproval.purchase_timeline || "—"],
+                      ].map(([k, v], i) => (
+                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
+                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
+                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem", marginBottom:"1.5rem" }}>
+                    <div style={{ fontSize:"0.7rem", textTransform:"uppercase", letterSpacing:"0.1em", color:"var(--muted)", fontWeight:700, marginBottom:"1rem" }}>Debts & Assets</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
+                      {[
+                        ["Auto Loan", selectedPreApproval.debt_car_loan ? formatCurrency(selectedPreApproval.debt_car_loan) : "—"],
+                        ["Student Loans", selectedPreApproval.debt_student_loan ? formatCurrency(selectedPreApproval.debt_student_loan) : "—"],
+                        ["Credit Cards", selectedPreApproval.debt_credit_card ? formatCurrency(selectedPreApproval.debt_credit_card) : "—"],
+                        ["Checking Balance", selectedPreApproval.checking_balance ? formatCurrency(selectedPreApproval.checking_balance) : "—"],
+                        ["Savings Balance", selectedPreApproval.savings_balance ? formatCurrency(selectedPreApproval.savings_balance) : "—"],
+                        ["Retirement", selectedPreApproval.retirement_balance ? formatCurrency(selectedPreApproval.retirement_balance) : "—"],
+                      ].map(([k, v], i) => (
+                        <div key={i} style={{ padding:"0.75rem", background:"var(--surface)", borderRadius:"8px" }}>
+                          <div style={{ fontSize:"0.7rem", color:"var(--muted)", marginBottom:"0.25rem" }}>{k}</div>
+                          <div style={{ fontWeight:700, color:"var(--text)" }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {!preApprovalDecision ? (
+                    <div style={{ display:"flex", gap:"0.75rem" }}>
+                      <button className="l-btn-deny" style={{ flex:1 }} onClick={() => setPreApprovalDecision("deny")}>✕ Reject</button>
+                      <button className="l-btn-approve" style={{ flex:1 }} onClick={() => setPreApprovalDecision("approve")}>✓ Approve Pre-Approval</button>
+                    </div>
+                  ) : (
+                    <div style={{ borderTop:"1px solid var(--border)", paddingTop:"1.5rem" }}>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.1rem", fontWeight:700, marginBottom:"1rem" }}>
+                        {preApprovalDecision === "approve" ? "Set Pre-Approval Amount" : "Provide Rejection Reason"}
+                      </div>
+                      {preApprovalDecision === "approve" && (
+                        <div style={{ marginBottom:"1rem" }}>
+                          <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>Pre-Approval Amount ($) *</label>
+                          <input className="l-input" style={{ width:"100%", fontSize:"1rem" }} placeholder="e.g. 350000" value={preApprovalAmount} onChange={e=>setPreApprovalAmount(e.target.value)} type="number" />
+                        </div>
+                      )}
+                      <div style={{ marginBottom:"1.5rem" }}>
+                        <label style={{ display:"block", fontSize:"0.8rem", color:"var(--muted)", marginBottom:"0.35rem" }}>
+                          {preApprovalDecision === "approve" ? "Conditions / Notes" : "Rejection Reason *"}
+                        </label>
+                        <textarea className="l-input" style={{ width:"100%", minHeight:"100px", resize:"vertical" }} value={preApprovalConditions} onChange={e=>setPreApprovalConditions(e.target.value)} placeholder="Add details..." />
+                      </div>
+                      <div style={{ display:"flex", gap:"0.75rem" }}>
+                        <button className="l-btn-secondary" style={{ flex:1 }} onClick={() => { setPreApprovalDecision(null); setPreApprovalAmount(""); setPreApprovalConditions(""); }}>Back</button>
+                        <button
+                          className={preApprovalDecision === "approve" ? "l-btn-approve" : "l-btn-deny"}
+                          style={{ flex:2 }}
+                          onClick={() => doPreApprovalDecision(preApprovalDecision)}
+                        >
+                          Confirm {preApprovalDecision === "approve" ? "Approval" : "Rejection"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
