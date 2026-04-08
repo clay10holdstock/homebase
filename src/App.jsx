@@ -2555,8 +2555,12 @@ function LenderPortal({ user, onLogout }) {
                     </thead>
                     <tbody>
                       {preApprovalQueue.map((p,i) => {
+                        const onClick = () => {
+                          console.log("Clicked pre-approval row:", p);
+                          setSelectedPreApproval(p);
+                        };
                         return (
-                          <tr key={i} onClick={(e) => { e.stopPropagation(); setSelectedPreApproval(p); }} style={{ cursor: "pointer", userSelect: "none" }}>
+                          <tr key={i} onClick={onClick} style={{ cursor: "pointer", userSelect: "none" }}>
                             <td style={{ fontWeight:600 }}>{`${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email}</td>
                             <td style={{ color:"var(--muted)", fontSize:"0.82rem" }}>{p.email}</td>
                             <td><span className="mono">{p.annual_income ? formatCurrency(p.annual_income) : "—"}</span></td>
