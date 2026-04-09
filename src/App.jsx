@@ -1922,13 +1922,21 @@ function LenderPortal({ user, onLogout }) {
   };
 
   const doPreApprovalDecision = async (decision) => {
-    if (!selectedPreApproval) return;
+    console.log("doPreApprovalDecision called with:", decision);
+    console.log("selectedPreApproval:", selectedPreApproval);
+    console.log("preApprovalAmount:", preApprovalAmount);
+
+    if (!selectedPreApproval) {
+      console.error("No selectedPreApproval");
+      return;
+    }
     if (decision === "approve" && !preApprovalAmount) {
       alert("Please enter a pre-approval amount");
       return;
     }
 
     try {
+      console.log("Updating database...");
       const { error } = await supabase
         .from("pre_approval_applications")
         .update({
@@ -1939,19 +1947,23 @@ function LenderPortal({ user, onLogout }) {
         })
         .eq("id", selectedPreApproval.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
 
+      console.log("Database update successful");
       setPreApprovalQueue(prev => prev.filter(p => p.id !== selectedPreApproval.id));
       setPreApprovalDone(true);
-      
+
       // Close modal and reset form
       setSelectedPreApproval(null);
       setPreApprovalDecision(null);
       setPreApprovalAmount("");
       setPreApprovalConditions("");
-      
+
       // Show success message
-      alert(`Application ${decision === "approve" ? "approved" : "denied"}successfully!`);
+      alert(`Application ${decision === "approve" ? "approved" : "denied"} successfully!`);
     } catch (err) {
       console.error("Pre-approval decision error:", err);
       alert("Error recording decision: " + (err.message || "Unknown error"));
