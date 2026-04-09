@@ -1937,7 +1937,7 @@ function LenderPortal({ user, onLogout }) {
 
     try {
       console.log("Updating database...");
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("pre_approval_applications")
         .update({
           status: decision === "approve" ? "pre_approved" : "denied",
@@ -1945,14 +1945,37 @@ function LenderPortal({ user, onLogout }) {
           conditions_notes: preApprovalConditions || null,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", selectedPreApproval.id);
+        .eq("id", selectedPreApproval.id)
+        .select();
+
+      console.log("Update response:", { data, error });
 
       if (error) {
         console.error("Database error:", error);
         throw error;
       }
 
-      console.log("Database update successful");
+      if (!data || data.length === 0) {
+        console.error("No data returned from update - record may not exist or update failed");
+        alert("Update failed - no data returned");
+        return;
+      }
+
+      console.log("Updated record:", data[0]);
+      console.log("Database update successful - status changed to:", data[0].status);
+
+      // Verify the update worked by fetching the record
+      const { data: verifyData, error: verifyError } = await supabase
+        .from("pre_approval_applications")
+        .select("id, status, pre_approval_amount, conditions_notes, updated_at")
+        .eq("id", selectedPreApproval.id)
+        .single();
+
+      if (verifyError) {
+        console.error("Verification fetch error:", verifyError);
+      } else {
+        console.log("Verification - record after update:", verifyData);
+      }
       setPreApprovalQueue(prev => prev.filter(p => p.id !== selectedPreApproval.id));
       setPreApprovalDone(true);
 
